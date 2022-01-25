@@ -78,17 +78,14 @@ router.post('/initiate/:userId', async (req, res) => {
       checkoutId: checkoutId,
       total: clientTotal,
       message: 'Checkout initiated',
-      raceConditionVulnerable: true,
-      paymentInfoStored: true,
       activeCheckouts: Object.keys(activeCheckouts).length
     });
     
   } catch (error) {
+    console.error('Checkout initiation error:', error.message);
     res.status(500).json({
       success: false,
-      error: error.message,
-      stack: error.stack,
-      requestData: req.body
+      error: 'Failed to initiate checkout'
     });
   }
 });
@@ -301,8 +298,7 @@ router.post('/concurrent/:userId', async (req, res) => {
       success: true,
       message: 'Concurrent checkout completed',
       results: results,
-      raceConditionDemonstrated: true,
-      potentialDoubleSpending: results.filter(r => r.success).length > 1
+      successfulOrders: results.filter(r => r.success).length
     });
     
   } catch (error) {
@@ -456,7 +452,6 @@ router.post('/debug/force-race/:userId', async (req, res) => {
       message: 'Race condition test completed',
       raceResults: raceResults,
       successfulOrders: raceResults.filter(r => r.success).length,
-      raceConditionDemonstrated: raceResults.filter(r => r.success).length > 1,
       timestamp: new Date()
     });
     

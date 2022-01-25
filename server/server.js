@@ -65,7 +65,9 @@ app.use(cors({
     const allowedOrigins = [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3000',
-      'https://localhost:3000'
+      'https://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://127.0.0.1:3000'
     ];
     
     // Allow requests with no origin (mobile apps, etc.)
@@ -144,8 +146,9 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ecomme
 
 mongoose.connect(MONGODB_URI, {
   maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
+  family: 4
 })
 .then(() => {
   console.log('Connected to MongoDB');

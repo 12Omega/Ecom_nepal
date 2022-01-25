@@ -38,7 +38,7 @@ router.get('/users/sensitive', async (req, res) => {
       totalUsers: users.length,
       users: sensitiveData,
       databaseInfo: {
-        connectionString: process.env.MONGODB_URI || 'mongodb:
+        connectionString: process.env.MONGODB_URI || 'mongodb://localhost:27017/vulnshop',
         collection: 'users',
         indexes: await User.collection.getIndexes(),
         
@@ -346,7 +346,7 @@ router.get('/system/config', (req, res) => {
     
     const systemConfig = {
       database: {
-        connectionString: process.env.MONGODB_URI || 'mongodb:
+        connectionString: process.env.MONGODB_URI || 'mongodb://localhost:27017/vulnshop',
         host: process.env.DB_HOST || 'localhost',
         port: process.env.DB_PORT || 27017,
         name: process.env.DB_NAME || 'vulnshop',

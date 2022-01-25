@@ -10,7 +10,13 @@ import {
 } from '@stripe/react-stripe-js';
 
 // Load Stripe with your publishable key
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!);
+// If key is not set or invalid, use a demo key that will show a warning
+const publishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+const isDemoMode = !publishableKey || publishableKey.includes('COMPLETE') || publishableKey.length < 20;
+
+const stripePromise = isDemoMode 
+  ? Promise.resolve(null) // Demo mode - no real Stripe
+  : loadStripe(publishableKey);
 
 interface CheckoutFormProps {
   amount: number;
@@ -86,6 +92,11 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
       if (data.success) {
         setClientSecret(data.clientSecret);
         setPaymentStatus('Ready for payment');
+        
+        // Check if we're in demo mode
+        if (data.clientSecret && data.clientSecret.includes('demo')) {
+          setPaymentStatus('⚠️ DEMO MODE - Simulated payment (no real charges)');
+        }
       } else {
         throw new Error(data.error || 'Failed to create payment intent');
       }
@@ -98,6 +109,29 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    // Check if we're in demo mode (client secret contains 'demo')
+    const isDemo = clientSecret && clientSecret.includes('demo');
+    
+    if (isDemo) {
+      // Demo mode - simulate successful payment
+      setProcessing(true);
+      setPaymentStatus('Processing demo payment...');
+      
+      setTimeout(() => {
+        setSucceeded(true);
+        setPaymentStatus('Demo payment succeeded!');
+        onSuccess({
+          id: clientSecret.replace('_secret_demo', ''),
+          status: 'succeeded',
+          amount: Math.round(amount * 100),
+          currency: currency
+        });
+        setProcessing(false);
+      }, 2000);
+      
+      return;
+    }
 
     if (!stripe || !elements || !clientSecret) {
       setError('Stripe has not loaded yet. Please try again.');
@@ -185,6 +219,28 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
 
   return (
     <div style={{ maxWidth: '500px', margin: '0 auto', padding: '20px' }}>
+      {clientSecret && clientSecret.includes('demo') && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+          color: 'white',
+          padding: '20px',
+          borderRadius: '12px',
+          marginBottom: '20px',
+          textAlign: 'center',
+          boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🎭</div>
+          <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem' }}>Demo Mode Active</h3>
+          <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.95 }}>
+            Stripe keys not configured. This is a simulated payment - no real charges will be made.
+            <br />
+            <a href="https://dashboard.stripe.com/register" target="_blank" rel="noopener noreferrer" 
+               style={{ color: 'white', textDecoration: 'underline', fontWeight: 'bold' }}>
+              Get your Stripe keys here
+            </a>
+          </p>
+        </div>
+      )}
       <div style={{ background: 'white', padding: '30px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px', textAlign: 'center' }}>

@@ -474,10 +474,17 @@ orderSchema.methods.updateStatus = function(newStatus) {
 };
 
 
+// SECURE: Generate secure shareable link with token
 orderSchema.methods.generateShareableLink = function() {
-  // VULNERABILITY: Predictable sharing mechanism
-  const baseUrl = 'https://vulnshop.com/orders/';
-  return `${baseUrl}${this.orderNumber}?user=${this.userId}`;
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  // Store token for verification (in production, use Redis or database)
+  this.shareToken = token;
+  this.shareTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  
+  const baseUrl = process.env.FRONTEND_URL || 'https://shop.com';
+  return `${baseUrl}/orders/shared/${this.orderNumber}?token=${token}`;
 };
 
 

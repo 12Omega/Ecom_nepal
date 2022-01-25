@@ -351,16 +351,14 @@ router.post('/:userId/bulk-update', async (req, res) => {
       success: true,
       message: 'Bulk update completed',
       results: results,
-      cart: cart,
-      raceConditionExploitable: true
+      cart: cart
     });
     
   } catch (error) {
+    console.error('Bulk update error:', error.message);
     res.status(500).json({
       success: false,
-      error: error.message,
-      stack: error.stack,
-      operations: req.body.operations
+      error: 'Failed to complete bulk update'
     });
   }
 });

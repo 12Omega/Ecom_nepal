@@ -1,5 +1,6 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import HomePage from './components/HomePage';
 import ProductCatalog from './components/ProductCatalog';
 import ShoppingCart from './components/ShoppingCart';
@@ -14,6 +15,7 @@ import TermsOfService from './components/TermsOfService';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import ComingSoon from './components/ComingSoon';
+import UserProfile from './components/UserProfile';
 import './App.css';
 
 // Types
@@ -73,8 +75,12 @@ const Navigation: React.FC<{
   cartItems: CartItem[]
 }> = ({ user, onAuthClick, onLogout, getTotalItems, getTotalPrice, onCheckout, cartItems }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -83,6 +89,26 @@ const Navigation: React.FC<{
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    try {
+      // Direct call to backend - will be captured by Burp Suite!
+      const response = await axios.get(`http://localhost:5000/api/products/search?q=${query}`);
+      setSearchResults(response.data.products || []);
+      setShowResults(true);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    }
+  };
 
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠' },
@@ -134,6 +160,105 @@ const Navigation: React.FC<{
           <span style={{ fontSize: '2rem' }}>🛍️</span>
           ModernShop
         </Link>
+
+        {/* Search Bar - THIS WILL CALL THE API! */}
+        <div style={{ 
+          flex: 1, 
+          maxWidth: '500px',
+          position: 'relative',
+          margin: '0 30px'
+        }}>
+          <input
+            type="text"
+            placeholder="🔍 Search products... (Try: phone, laptop, shirt)"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            onFocus={() => searchResults.length > 0 && setShowResults(true)}
+            style={{
+              width: '100%',
+              padding: '12px 20px',
+              borderRadius: '50px',
+              border: isScrolled ? '2px solid #e2e8f0' : '2px solid rgba(255,255,255,0.3)',
+              fontSize: '0.95rem',
+              outline: 'none',
+              background: isScrolled ? 'white' : 'rgba(255,255,255,0.95)',
+              color: '#1a202c',
+              transition: 'all 0.3s ease'
+            }}
+          />
+
+          {/* Search Results Dropdown */}
+          {showResults && searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '55px',
+              left: 0,
+              right: 0,
+              background: 'white',
+              borderRadius: '20px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              zIndex: 2000
+            }}>
+              {searchResults.slice(0, 5).map((product) => (
+                <div
+                  key={product._id}
+                  onClick={() => {
+                    navigate(`/product/${product._id}`);
+                    setShowResults(false);
+                    setSearchQuery('');
+                  }}
+                  style={{
+                    padding: '15px 20px',
+                    borderBottom: '1px solid #e2e8f0',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                >
+                  <img 
+                    src={product.imageUrl} 
+                    alt={product.name}
+                    style={{
+                      width: '50px',
+                      height: '50px',
+                      objectFit: 'cover',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', color: '#1a202c' }}>
+                      {product.name}
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                      ${product.price}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Click outside to close results */}
+        {showResults && (
+          <div 
+            onClick={() => setShowResults(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1999
+            }}
+          />
+        )}
 
         {/* Desktop Navigation */}
         <nav style={{ 
@@ -765,6 +890,7 @@ function App() {
               <Route path="/faq" element={<FAQ />} />
               <Route path="/cart" element={<ShoppingCart />} />
               <Route path="/payment-demo" element={<PaymentDemo />} />
+              <Route path="/profile/:userId" element={<UserProfile />} />
               
               {/* Coming Soon Pages */}
               <Route path="/shipping" element={

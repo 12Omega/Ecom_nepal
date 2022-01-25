@@ -3,32 +3,71 @@ const router = express.Router();
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const { authenticateToken } = require('../middleware/auth');
+const { requireRole, requirePermission } = require('../middleware/rbac');
+const { ActivityLogger } = require('../services/activityLogger');
 
+// SECURE: All admin routes require authentication and admin role
+router.use(authenticateToken);
+router.use(requireRole('admin'));
 
+// Admin panel root
 router.get('/', (req, res) => {
   res.json({
     message: 'Admin Panel',
     endpoints: [
       '/api/admin/dashboard',
       '/api/admin/users',
-      '/api/admin/products'
-    ]
+      '/api/admin/products',
+      '/api/admin/orders'
+    ],
+    user: {
+      id: req.user._id,
+      username: req.user.username,
+      role: req.user.role
+    }
   });
 });
 
-
+// SECURE: Admin dashboard with proper authentication
 router.get('/dashboard', async (req, res) => {
   try {
     const userCount = await User.countDocuments();
     const productCount = await Product.countDocuments();
     const orderCount = await Order.countDocuments();
     
+    // Get recent activity (last 24 hours)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentUsers = await User.countDocuments({ createdAt: { $gte: yesterday } });
+    const recentOrders = await Order.countDocuments({ createdAt: { $gte: yesterday } });
+    
+    // Calculate total revenue
+    const revenueResult = await Order.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+    const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
+    
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_DASHBOARD_VIEW',
+      details: { timestamp: new Date() },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'SYSTEM',
+      severity: 'LOW'
+    });
+    
     res.json({
       message: 'Admin Dashboard',
-      stats: {
-        users: userCount,
-        products: productCount,
-        orders: orderCount
+      statistics: {
+        totalUsers: userCount,
+        totalProducts: productCount,
+        totalOrders: orderCount,
+        totalRevenue: totalRevenue,
+        recentUsers: recentUsers,
+        recentOrders: recentOrders
       },
       timestamp: new Date().toISOString()
     });
@@ -41,13 +80,40 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-
-router.get('/users', async (req, res) => {
+// SECURE: Get all users (admin only)
+router.get('/users', requirePermission('admin:users:read'), async (req, res) => {
   try {
-    const users = await User.find({}).select('-password');
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    
+    const users = await User.find({})
+      .select('-password -sessionToken -resetToken -emailVerificationToken -twoFactorSecret')
+      .limit(limit)
+      .skip(skip)
+      .sort({ createdAt: -1 });
+    
+    const total = await User.countDocuments();
+    
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_USERS_LIST',
+      details: { page, limit, total },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'DATA_ACCESS',
+      severity: 'MEDIUM'
+    });
+    
     res.json({
       users: users,
-      count: users.length
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     console.error('Users fetch error:', error.message);
@@ -58,15 +124,29 @@ router.get('/users', async (req, res) => {
   }
 });
 
-
-router.get('/users/:userId', async (req, res) => {
+// SECURE: Get specific user (admin only)
+router.get('/users/:userId', requirePermission('admin:users:read'), async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId).select('-password');
+    const user = await User.findById(req.params.userId)
+      .select('-password -sessionToken -resetToken -emailVerificationToken -twoFactorSecret');
+    
     if (!user) {
       return res.status(404).json({
         error: 'User not found'
       });
     }
+    
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_USER_VIEW',
+      details: { viewedUserId: user._id, viewedUsername: user.username },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'DATA_ACCESS',
+      severity: 'MEDIUM'
+    });
+    
     res.json({ user });
   } catch (error) {
     console.error('User fetch error:', error.message);
@@ -77,14 +157,22 @@ router.get('/users/:userId', async (req, res) => {
   }
 });
 
-
-router.put('/users/:userId/role', async (req, res) => {
+// SECURE: Update user role (admin only)
+router.put('/users/:userId/role', requirePermission('admin:users:update'), async (req, res) => {
   try {
     const { role } = req.body;
     
-    if (!['user', 'admin'].includes(role)) {
+    // Validate role
+    if (!['user', 'admin', 'moderator', 'vendor'].includes(role)) {
       return res.status(400).json({
-        error: 'Invalid role'
+        error: 'Invalid role. Must be one of: user, admin, moderator, vendor'
+      });
+    }
+    
+    // Prevent self-demotion
+    if (req.params.userId === req.user._id.toString() && role !== 'admin') {
+      return res.status(400).json({
+        error: 'Cannot change your own admin role'
       });
     }
     
@@ -92,7 +180,7 @@ router.put('/users/:userId/role', async (req, res) => {
       req.params.userId,
       { role },
       { new: true }
-    ).select('-password');
+    ).select('-password -sessionToken -resetToken -emailVerificationToken -twoFactorSecret');
     
     if (!user) {
       return res.status(404).json({
@@ -100,8 +188,23 @@ router.put('/users/:userId/role', async (req, res) => {
       });
     }
     
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ROLE_CHANGE',
+      details: { 
+        targetUserId: user._id,
+        targetUsername: user.username,
+        newRole: role
+      },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'AUTHORIZATION',
+      severity: 'HIGH'
+    });
+    
     res.json({
-      message: 'User role updated',
+      message: 'User role updated successfully',
       user
     });
   } catch (error) {
@@ -113,472 +216,270 @@ router.put('/users/:userId/role', async (req, res) => {
   }
 });
 
-module.exports = router;
-  res.json({
-    message: 'Control Panel (CP)',
-    path: '/admin/cp',
-    vulnerability: 'Abbreviated admin URL'
-  });
-});
-
-router.get('/console', (req, res) => {
-  poorLogger.adminAction('console access');
-  res.json({
-    message: 'Admin Console',
-    path: '/admin/console',
-    vulnerability: 'Console-style admin interface'
-  });
-});
-
-
-
-
-
-router.get('/dashboard', async (req, res) => {
-  try {
-    
-    poorLogger.log('Dashboard accessed');
-    
-    
-    
-    const userCount = await User.countDocuments();
-    const productCount = await Product.countDocuments();
-    const orderCount = await Order.countDocuments();
-    
-    
-    const allUsers = await User.find({}).select('+password');
-    const allOrders = await Order.find({}).populate('userId');
-    
-    res.json({
-      message: 'Admin Dashboard - No Authentication Required!',
-      systemInfo: {
-        nodeVersion: process.version,
-        platform: process.platform,
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        pid: process.pid,
-        cwd: process.cwd(),
-        env: process.env 
-      },
-      statistics: {
-        totalUsers: userCount,
-        totalProducts: productCount,
-        totalOrders: orderCount
-      },
-      sensitiveData: {
-        allUsers: allUsers, 
-        allOrders: allOrders, 
-        databaseConnection: process.env.MONGODB_URI
-      }
-    });
-  } catch (error) {
-    
-    poorLogger.log('Dashboard error occurred');
-    res.status(500).json({
-      error: 'Admin dashboard error - VERBOSE DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack, 
-      query: req.query,
-      headers: req.headers, 
-      systemInfo: {
-        nodeVersion: process.version,
-        platform: process.platform,
-        architecture: process.arch,
-        hostname: require('os').hostname(),
-        networkInterfaces: require('os').networkInterfaces(),
-        cpus: require('os').cpus(),
-        memory: process.memoryUsage(),
-        pid: process.pid,
-        ppid: process.ppid,
-        cwd: process.cwd(),
-        execPath: process.execPath,
-        argv: process.argv
-      },
-      databaseInfo: {
-        connectionString: process.env.MONGODB_URI,
-        readyState: require('mongoose').connection.readyState,
-        host: require('mongoose').connection.host,
-        port: require('mongoose').connection.port,
-        name: require('mongoose').connection.name
-      }
-    });
-  }
-});
-
-
-router.get('/users', async (req, res) => {
-  try {
-    
-    poorLogger.adminAction('users list accessed');
-    
-    
-    
-    const users = await User.find({}).select('+password');
-    
-    res.json({
-      message: 'All users data - accessible to everyone!',
-      users: users,
-      totalCount: users.length,
-      exposedFields: ['username', 'email', 'password', 'role', 'profile', 'sessionToken']
-    });
-  } catch (error) {
-    
-    poorLogger.log('Error in users endpoint');
-    res.status(500).json({
-      error: 'User listing error - SYSTEM DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString(),
-      systemInfo: {
-        nodeVersion: process.version,
-        platform: process.platform,
-        memory: process.memoryUsage(),
-        uptime: process.uptime()
-      },
-      databaseState: require('mongoose').connection.readyState
-    });
-  }
-});
-
-
-router.delete('/users/:userId', async (req, res) => {
+// SECURE: Delete user (admin only)
+router.delete('/users/:userId', requirePermission('admin:users:delete'), async (req, res) => {
   try {
     const { userId } = req.params;
     
+    // Prevent self-deletion
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({
+        error: 'Cannot delete your own account'
+      });
+    }
     
-    poorLogger.adminAction('user deletion attempt');
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        error: 'User not found'
+      });
+    }
     
+    // Soft delete by deactivating account
+    user.accountStatus = 'inactive';
+    await user.save();
     
-    
-    
-    const deletedUser = await User.findByIdAndDelete(userId);
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_USER_DELETE',
+      details: { 
+        deletedUserId: user._id,
+        deletedUsername: user.username
+      },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'DATA_ACCESS',
+      severity: 'HIGH'
+    });
     
     res.json({
-      message: 'User deleted by anyone - no admin check!',
-      deletedUser: deletedUser,
-      deletedBy: 'Unknown - no authentication',
+      message: 'User account deactivated successfully',
+      userId: user._id
+    });
+  } catch (error) {
+    console.error('User deletion error:', error.message);
+    res.status(500).json({
+      error: 'Failed to delete user',
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
-    
-    poorLogger.log('User deletion failed');
-    res.status(500).json({
-      error: 'User deletion error - OPERATION DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      attemptedUserId: req.params.userId,
-      requestInfo: {
-        method: req.method,
-        url: req.url,
-        headers: req.headers,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      },
-      systemState: {
-        memory: process.memoryUsage(),
-        uptime: process.uptime(),
-        pid: process.pid
-      }
-    });
   }
 });
 
-
-router.post('/users/:userId/promote', async (req, res) => {
+// SECURE: Create product (admin only)
+router.post('/products', requirePermission('admin:products:manage'), async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { name, description, price, category, imageUrl, stock } = req.body;
     
-    
-    poorLogger.adminAction('user promotion');
-    
-    
-    
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { role: 'admin' },
-      { new: true }
-    );
-    
-    res.json({
-      message: 'User promoted to admin - no authorization required!',
-      promotedUser: updatedUser,
-      promotedBy: 'Anyone can do this',
-      securityNote: 'This is a critical vulnerability!'
-    });
-  } catch (error) {
-    
-    poorLogger.log('User promotion failed');
-    res.status(500).json({
-      error: 'User promotion error - ATTEMPT DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      attemptedPromotion: {
-        userId: req.params.userId,
-        targetRole: 'admin',
-        requestBody: req.body
-      },
-      securityImplication: 'Privilege escalation attempt details exposed'
-    });
-  }
-});
-
-
-router.post('/products', async (req, res) => {
-  try {
-    const { name, description, price, category, imageUrl } = req.body;
-    
-    
-    poorLogger.adminAction('product created');
-    
-    
-    
+    // Validate required fields
+    if (!name || !description || !price || !category) {
+      return res.status(400).json({
+        error: 'Missing required fields: name, description, price, category'
+      });
+    }
     
     const product = new Product({
-      name: name, 
-      description: description, 
-      price: price,
-      category: category,
-      imageUrl: imageUrl,
-      createdBy: req.body.createdBy || new require('mongoose').Types.ObjectId(), 
-      stock: req.body.stock || 0
+      name,
+      description,
+      price,
+      category,
+      imageUrl: imageUrl || '',
+      stock: stock || 0,
+      createdBy: req.user._id,
+      lastModifiedBy: req.user._id
     });
     
     await product.save();
     
-    res.json({
-      message: 'Product created with XSS vulnerability!',
-      product: product,
-      xssNote: 'Name and description not sanitized',
-      createdBy: 'Anyone - no admin check'
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_PRODUCT_CREATE',
+      details: { 
+        productId: product._id,
+        productName: product.name
+      },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'DATA_ACCESS',
+      severity: 'MEDIUM'
+    });
+    
+    res.status(201).json({
+      message: 'Product created successfully',
+      product: product.toPublicJSON()
     });
   } catch (error) {
-    
-    poorLogger.log('Product creation failed');
+    console.error('Product creation error:', error.message);
     res.status(500).json({
-      error: 'Product creation error - SUBMITTED DATA EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      submittedData: req.body, 
-      validationErrors: error.errors,
-      systemInfo: {
-        timestamp: new Date().toISOString(),
-        nodeVersion: process.version,
-        memory: process.memoryUsage()
-      }
+      error: 'Failed to create product',
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-
-router.put('/products/:productId', async (req, res) => {
+// SECURE: Update product (admin only)
+router.put('/products/:productId', requirePermission('admin:products:manage'), async (req, res) => {
   try {
     const { productId } = req.params;
     const updateData = req.body;
     
+    // Remove fields that shouldn't be updated directly
+    delete updateData._id;
+    delete updateData.createdBy;
+    delete updateData.createdAt;
+    delete updateData.__v;
     
-    poorLogger.adminAction('product updated');
+    // Add last modified info
+    updateData.lastModifiedBy = req.user._id;
+    updateData.updatedAt = new Date();
     
-    
-    
-    
-    const updatedProduct = await Product.findByIdAndUpdate(
+    const product = await Product.findByIdAndUpdate(
       productId,
-      updateData, 
-      { new: true }
+      updateData,
+      { new: true, runValidators: true }
     );
     
-    res.json({
-      message: 'Product updated with potential XSS!',
-      product: updatedProduct,
-      xssWarning: 'All fields updated without sanitization',
-      updatedBy: 'Anyone - no authorization'
-    });
-  } catch (error) {
-    
-    poorLogger.log('Product update failed');
-    res.status(500).json({
-      error: 'Product update error - UPDATE DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      updateData: req.body, 
-      productId: req.params.productId,
-      operationDetails: {
-        method: 'findByIdAndUpdate',
-        options: { new: true },
-        timestamp: new Date().toISOString()
-      }
-    });
-  }
-});
-
-
-router.get('/config', (req, res) => {
-  
-  poorLogger.log('Config accessed');
-  
-  
-  res.json({
-    message: 'System configuration exposed to everyone!',
-    environment: process.env, 
-    config: {
-      database: process.env.MONGODB_URI,
-      jwtSecret: process.env.JWT_SECRET || 'default-weak-secret',
-      sessionSecret: 'weak-secret-key',
-      uploadPath: './uploads',
-      allowedOrigins: '*'
-    },
-    systemInfo: {
-      nodeVersion: process.version,
-      platform: process.platform,
-      architecture: process.arch,
-      cpus: require('os').cpus(),
-      memory: process.memoryUsage(),
-      uptime: process.uptime(),
-      hostname: require('os').hostname(),
-      networkInterfaces: require('os').networkInterfaces(),
-      userInfo: require('os').userInfo(),
-      tmpdir: require('os').tmpdir(),
-      homedir: require('os').homedir()
-    },
-    processInfo: {
-      pid: process.pid,
-      ppid: process.ppid,
-      cwd: process.cwd(),
-      execPath: process.execPath,
-      argv: process.argv,
-      env: process.env
-    }
-  });
-});
-
-
-router.get('/database/users', async (req, res) => {
-  try {
-    
-    poorLogger.log('Database users accessed');
-    
-    
-    
-    const users = await User.find({}).select('+password');
-    
-    res.json({
-      message: 'Direct database access - no security!',
-      users: users,
-      warning: 'Passwords exposed in plaintext or weak hash'
-    });
-  } catch (error) {
-    
-    poorLogger.log('Database access failed');
-    res.status(500).json({
-      error: 'Database access error - CONNECTION DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      databaseInfo: {
-        connectionString: process.env.MONGODB_URI,
-        readyState: require('mongoose').connection.readyState,
-        host: require('mongoose').connection.host,
-        port: require('mongoose').connection.port,
-        name: require('mongoose').connection.name,
-        collections: require('mongoose').connection.db ? 
-          Object.keys(require('mongoose').connection.db.collections) : []
-      }
-    });
-  }
-});
-
-
-router.post('/database/query', async (req, res) => {
-  try {
-    const { collection, operation, query, update } = req.body;
-    
-    
-    poorLogger.adminAction('database query executed');
-    
-    
-    
-    let result;
-    const db = require('mongoose').connection.db;
-    
-    switch (operation) {
-      case 'find':
-        result = await db.collection(collection).find(query || {}).toArray();
-        break;
-      case 'update':
-        result = await db.collection(collection).updateMany(query || {}, update || {});
-        break;
-      case 'delete':
-        result = await db.collection(collection).deleteMany(query || {});
-        break;
-      default:
-        result = await db.collection(collection).find({}).toArray();
+    if (!product) {
+      return res.status(404).json({
+        error: 'Product not found'
+      });
     }
     
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_PRODUCT_UPDATE',
+      details: { 
+        productId: product._id,
+        productName: product.name,
+        updatedFields: Object.keys(updateData)
+      },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'DATA_ACCESS',
+      severity: 'MEDIUM'
+    });
+    
     res.json({
-      message: 'Arbitrary database query executed!',
-      operation: operation,
-      collection: collection,
-      query: query,
-      result: result,
-      warning: 'This allows complete database manipulation'
+      message: 'Product updated successfully',
+      product: product.toPublicJSON()
     });
   } catch (error) {
-    
-    poorLogger.log('Database query failed');
+    console.error('Product update error:', error.message);
     res.status(500).json({
-      error: 'Database query error - QUERY DETAILS EXPOSED',
-      details: error.message,
-      stack: error.stack,
-      submittedQuery: req.body, 
-      databaseState: {
-        readyState: require('mongoose').connection.readyState,
-        collections: require('mongoose').connection.db ? 
-          Object.keys(require('mongoose').connection.db.collections) : [],
-        connectionInfo: {
-          host: require('mongoose').connection.host,
-          port: require('mongoose').connection.port,
-          name: require('mongoose').connection.name
-        }
-      }
+      error: 'Failed to update product',
+      timestamp: new Date().toISOString()
     });
   }
 });
 
-
-router.get('/logs', (req, res) => {
-  poorLogger.log('Logs accessed');
-  res.json({
-    message: 'Admin logs - no authentication required',
-    path: '/admin/logs',
-    vulnerability: 'Predictable logs endpoint',
-    note: 'Real logs would be exposed here'
-  });
+// SECURE: Get all orders (admin only)
+router.get('/orders', requirePermission('admin:orders:read'), async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    
+    const orders = await Order.find({})
+      .populate('userId', 'username email')
+      .limit(limit)
+      .skip(skip)
+      .sort({ createdAt: -1 });
+    
+    const total = await Order.countDocuments();
+    
+    res.json({
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Orders fetch error:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch orders',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
-router.get('/settings', (req, res) => {
-  poorLogger.log('Settings accessed');
-  res.json({
-    message: 'Admin settings - accessible to all',
-    path: '/admin/settings',
-    vulnerability: 'Predictable settings endpoint'
-  });
+// SECURE: Update order status (admin only)
+router.put('/orders/:orderId/status', requirePermission('admin:orders:update'), async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    
+    const validStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+    
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { status, updatedAt: new Date() },
+      { new: true }
+    ).populate('userId', 'username email');
+    
+    if (!order) {
+      return res.status(404).json({
+        error: 'Order not found'
+      });
+    }
+    
+    await ActivityLogger.logActivity({
+      userId: req.user._id,
+      username: req.user.username,
+      action: 'ADMIN_ORDER_UPDATE',
+      details: { 
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        newStatus: status
+      },
+      ipAddress: ActivityLogger.getClientIP(req),
+      userAgent: req.get('User-Agent'),
+      category: 'TRANSACTION',
+      severity: 'MEDIUM'
+    });
+    
+    res.json({
+      message: 'Order status updated successfully',
+      order
+    });
+  } catch (error) {
+    console.error('Order update error:', error.message);
+    res.status(500).json({
+      error: 'Failed to update order',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
-router.get('/backup', (req, res) => {
-  poorLogger.log('Backup accessed');
-  res.json({
-    message: 'Backup interface - no security',
-    path: '/admin/backup',
-    vulnerability: 'Predictable backup endpoint'
-  });
-});
-
-router.get('/maintenance', (req, res) => {
-  poorLogger.log('Maintenance accessed');
-  res.json({
-    message: 'Maintenance mode - anyone can access',
-    path: '/admin/maintenance',
-    vulnerability: 'Predictable maintenance endpoint'
-  });
+// SECURE: Get security events (admin only)
+router.get('/security/events', requirePermission('admin:security:read'), async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const severity = req.query.severity || null;
+    
+    const events = await ActivityLogger.getSecurityEvents(limit, severity);
+    
+    res.json({
+      events,
+      count: events.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Security events fetch error:', error.message);
+    res.status(500).json({
+      error: 'Failed to fetch security events',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 module.exports = router;

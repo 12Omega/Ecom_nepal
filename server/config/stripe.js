@@ -6,12 +6,21 @@ const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const STRIPE_CURRENCY = process.env.STRIPE_CURRENCY || 'usd';
 
-if (!STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is required in environment variables');
+// Check if we're in demo mode (invalid or incomplete Stripe key)
+const isDemoMode = !STRIPE_SECRET_KEY || 
+                   STRIPE_SECRET_KEY.includes('COMPLETE_YOUR_SECRET_KEY') || 
+                   STRIPE_SECRET_KEY.length < 20;
+
+if (isDemoMode) {
+  console.log('\n⚠️  DEMO MODE: Stripe keys not configured properly');
+  console.log('💡 To use real Stripe payments:');
+  console.log('   1. Sign up at https://dashboard.stripe.com/register');
+  console.log('   2. Get your test API keys');
+  console.log('   3. Update STRIPE_SECRET_KEY in .env file\n');
 }
 
-// Initialize Stripe with API version
-const stripeInstance = stripe(STRIPE_SECRET_KEY, {
+// Initialize Stripe with API version (or create mock if in demo mode)
+const stripeInstance = isDemoMode ? null : stripe(STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16',
 });
 
@@ -148,10 +157,47 @@ const createIdempotencyKey = (orderId, userId, timestamp) => {
   return `${orderId}_${userId}_${timestamp}`;
 };
 
+// Mock Stripe for demo mode
+const createMockStripe = () => ({
+  paymentIntents: {
+    create: async (params) => {
+      console.log('🎭 DEMO MODE: Creating mock payment intent');
+      return {
+        id: `pi_demo_${Date.now()}`,
+        client_secret: `pi_demo_${Date.now()}_secret_demo`,
+        status: 'requires_payment_method',
+        amount: params.amount,
+        currency: params.currency,
+        metadata: params.metadata,
+        created: Math.floor(Date.now() / 1000)
+      };
+    },
+    retrieve: async (id) => {
+      console.log('🎭 DEMO MODE: Retrieving mock payment intent');
+      return {
+        id,
+        status: 'succeeded',
+        amount: 10000,
+        currency: 'usd',
+        created: Math.floor(Date.now() / 1000),
+        metadata: {}
+      };
+    }
+  },
+  webhooks: {
+    constructEvent: (payload, signature, secret) => {
+      return JSON.parse(payload);
+    }
+  }
+});
+
+// Use mock Stripe if in demo mode
+const finalStripeInstance = isDemoMode ? createMockStripe() : stripeInstance;
+
 const paymentTracker = new PaymentStatusTracker();
 
 module.exports = {
-  stripe: stripeInstance,
+  stripe: finalStripeInstance,
   logStripeActivity,
   verifyWebhookSignature,
   handleStripeError,
@@ -159,5 +205,6 @@ module.exports = {
   createIdempotencyKey,
   DEMO_CONFIG,
   STRIPE_CURRENCY,
-  STRIPE_PUBLISHABLE_KEY
+  STRIPE_PUBLISHABLE_KEY,
+  isDemoMode
 };
