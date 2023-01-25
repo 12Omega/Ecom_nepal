@@ -390,4 +390,5 @@ userSchema.statics.getAllUsers = async function() {
 
 const User = mongoose.model('User', userSchema);
 
-module.exports = User;
+module.exports = User;/ /   A d d e d   u s e r   v a l i d a t i o n  
+ 
