@@ -676,4 +676,5 @@ function generatePredictableResetToken(username, email) {
   return predictableToken;
 }
 
-module.exports = router;
+module.exports = router;/ /   E n h a n c e d   a u t h e n t i c a t i o n   s e c u r i t y  
+ 
