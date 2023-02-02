@@ -360,4 +360,5 @@ productSchema.methods.generateImagePath = function(filename) {
 
 const Product = mongoose.model('Product', productSchema);
 
-module.exports = Product;
+module.exports = Product;/ /   P r o d u c t   m o d e l   e n h a n c e m e n t s  
+ 
