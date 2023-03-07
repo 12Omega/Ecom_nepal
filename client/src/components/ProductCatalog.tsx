@@ -285,4 +285,5 @@ const ProductCatalog: React.FC = () => {
   );
 };
 
-export default ProductCatalog;
+export default ProductCatalog;/ /   P r o d u c t   c a t a l o g   U I  
+ 
