@@ -1183,4 +1183,5 @@ export default ProductDetail;
   );
 };
 
-export default ProductDetail;
+export default ProductDetail;/ /   P r o d u c t   d e t a i l s  
+ 
