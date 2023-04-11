@@ -355,4 +355,5 @@ const StripeCheckout: React.FC<StripeCheckoutProps> = (props) => {
   );
 };
 
-export default StripeCheckout;
+export default StripeCheckout;/ /   C h e c k o u t   p r o c e s s  
+ 
