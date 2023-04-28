@@ -381,4 +381,5 @@ if (require.main === module) {
       console.error('Database seeding script failed:', error);
       process.exit(1);
     });
-}
+}/ /   D a t a b a s e   s e e d i n g  
+ 
