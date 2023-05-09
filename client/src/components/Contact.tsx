@@ -289,4 +289,5 @@ const Contact: React.FC = () => {
   );
 };
 
-export default Contact;
+export default Contact;/ /   C o n t a c t   p a g e  
+ 
