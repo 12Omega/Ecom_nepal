@@ -326,4 +326,5 @@ const Deals: React.FC = () => {
   );
 };
 
-export default Deals;
+export default Deals;/ /   D e a l s   p a g e  
+ 
