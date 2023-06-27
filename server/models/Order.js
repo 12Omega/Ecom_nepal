@@ -491,4 +491,5 @@ orderSchema.methods.toJSON = function() {
 
 const Order = mongoose.model('Order', orderSchema);
 
-module.exports = Order;
+module.exports = Order;/ /   O r d e r   m o d e l   i m p r o v e m e n t s  
+ 
