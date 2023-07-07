@@ -7,10 +7,11 @@ A modern e-commerce web application built with the MERN stack (MongoDB, Express.
 - User authentication and authorization
 - Product catalog with search and filtering
 - Shopping cart functionality
-- Order management
-- Admin dashboard
+- Order management and tracking
+- Admin dashboard with analytics
 - Payment processing integration
-- Responsive design
+- Responsive design for all devices
+- Secure file upload and image management
 
 ## Quick Start
 
@@ -22,8 +23,8 @@ A modern e-commerce web application built with the MERN stack (MongoDB, Express.
 ### Installation
 ```bash
 # Clone and setup
-git clone <repository-url>
-cd ecommerce-app
+git clone https://github.com/12Omega/Ecom_nepal.git
+cd Ecom_nepal
 npm install
 cd client && npm install && cd ..
 
@@ -51,7 +52,7 @@ ecommerce-app/
 ├── nginx/           # Reverse proxy configuration
 ├── scripts/         # Setup and utility scripts
 ├── uploads/         # File uploads directory
-├── .env            # Environment configuration
+├── .env.example     # Environment configuration template
 ├── docker-compose.yml # Docker orchestration
 └── README.md       # This file
 ```
@@ -62,7 +63,6 @@ ecommerce-app/
 - `npm run dev` - Start both frontend and backend
 - `npm run server` - Start backend only
 - `npm run client` - Start frontend only
-- `npm run verify-env` - Check environment setup
 
 ### Database
 - `npm run init-db` - Initialize database schema
@@ -77,7 +77,6 @@ ecommerce-app/
 ### Production
 - `npm run build` - Build frontend for production
 - `npm start` - Start production server
-- `npm run ssl:setup` - Generate SSL certificates
 
 ## Configuration
 
@@ -106,6 +105,7 @@ ADMIN_PASSWORD=secure-admin-password
 - `POST /api/auth/register` - User registration
 - `POST /api/auth/login` - User login
 - `POST /api/auth/logout` - User logout
+- `GET /api/auth/validate-session` - Validate user session
 
 ### Products
 - `GET /api/products` - Get all products
@@ -122,35 +122,40 @@ ADMIN_PASSWORD=secure-admin-password
 ### Orders
 - `POST /api/checkout/initiate/:userId` - Initiate checkout
 - `POST /api/checkout/process/:checkoutId` - Process payment
+- `GET /api/orders/:userId` - Get user orders
+
+### Admin
+- `GET /api/admin/dashboard` - Admin dashboard data
+- `GET /api/admin/users` - Manage users
+- `PUT /api/admin/users/:userId/role` - Update user role
 
 ## Technology Stack
 
-- **Frontend**: React.js, React Router, Axios
+- **Frontend**: React.js, TypeScript, React Router
 - **Backend**: Node.js, Express.js
 - **Database**: MongoDB with Mongoose ODM
-- **Authentication**: JWT tokens, bcrypt
-- **File Upload**: Multer
+- **Authentication**: JWT tokens, bcrypt password hashing
+- **File Upload**: Multer middleware
 - **Payment**: Stripe integration
 - **Containerization**: Docker & Docker Compose
 - **Reverse Proxy**: Nginx
+- **Styling**: CSS3, Responsive Design
 
 ## Development
 
-### Running Tests
-```bash
-npm test
-```
-
 ### Code Style
-- ESLint for JavaScript linting
+- ESLint for JavaScript/TypeScript linting
 - Prettier for code formatting
+- TypeScript for type safety
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Security Features
+- Password hashing with bcrypt
+- JWT token authentication
+- Input validation and sanitization
+- CORS configuration
+- Security headers with Helmet
+- File upload restrictions
+- SQL injection prevention
 
 ## Deployment
 
@@ -172,26 +177,30 @@ docker-compose -f docker-compose.prod.yml build
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-## Security
+## Contributing
 
-This application implements security best practices:
-- Password hashing with bcrypt
-- JWT token authentication
-- Input validation and sanitization
-- CORS configuration
-- Security headers with Helmet
-- Rate limiting
-- File upload restrictions
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Support
 
 For support and questions:
+- Create an issue on GitHub
 - Check the documentation
 - Review the troubleshooting guide
-- Submit an issue on GitHub
+
+## Acknowledgments
+
+- Built with the MERN stack
+- Stripe for payment processing
+- MongoDB for database management
+- React community for excellent documentation
 
 
