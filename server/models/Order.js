@@ -1,19 +1,19 @@
 const mongoose = require('mongoose');
 
-// Enhanced Order schema with comprehensive order details
+
 const orderSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    // VULNERABILITY: Insecure direct object reference - no access control
+    
   },
   orderNumber: {
     type: String,
     unique: true,
-    // VULNERABILITY: Predictable order numbers
+    
   },
-  // Order items with detailed information
+  
   items: [{
     productId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -35,12 +35,12 @@ const orderSchema = new mongoose.Schema({
     quantity: {
       type: Number,
       required: true,
-      // VULNERABILITY: No validation - allows negative quantities
+      
     },
     unitPrice: {
       type: Number,
       required: true,
-      // VULNERABILITY: Price stored per item - allows manipulation
+      
     },
     totalPrice: {
       type: Number,
@@ -54,7 +54,7 @@ const orderSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    // Product details at time of order
+    
     productDetails: {
       category: String,
       brand: String,
@@ -64,7 +64,7 @@ const orderSchema = new mongoose.Schema({
       weight: Number
     }
   }],
-  // Order totals
+  
   subtotal: {
     type: Number,
     required: true
@@ -84,9 +84,9 @@ const orderSchema = new mongoose.Schema({
   totalAmount: {
     type: Number,
     required: true,
-    // VULNERABILITY: Calculated client-side - can be manipulated
+    
   },
-  // Order status and tracking
+  
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned', 'refunded'],
@@ -101,9 +101,9 @@ const orderSchema = new mongoose.Schema({
       ref: 'User'
     }
   }],
-  // Payment information
+  
   paymentInfo: {
-    // VULNERABILITY: Sensitive payment data stored in plaintext
+    
     method: {
       type: String,
       enum: ['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cash_on_delivery', 'digital_wallet'],
@@ -123,19 +123,19 @@ const orderSchema = new mongoose.Schema({
     },
     cardNumber: {
       type: String,
-      // VULNERABILITY: No encryption - stored in plaintext
+      
     },
     expiryDate: {
       type: String,
-      // VULNERABILITY: No encryption - stored in plaintext
+      
     },
     cvv: {
       type: String,
-      // VULNERABILITY: No encryption - stored in plaintext
+      
     },
     cardholderName: {
       type: String,
-      // VULNERABILITY: No encryption - stored in plaintext
+      
     },
     billingAddress: {
       street: String,
@@ -145,13 +145,13 @@ const orderSchema = new mongoose.Schema({
       zipCode: String,
       country: String
     },
-    // Payment gateway details
+    
     gatewayResponse: {
       type: mongoose.Schema.Types.Mixed,
       default: {}
     }
   },
-  // Shipping information
+  
   shippingAddress: {
     recipientName: {
       type: String,
@@ -190,7 +190,7 @@ const orderSchema = new mongoose.Schema({
       default: ''
     }
   },
-  // Shipping details
+  
   shipping: {
     method: {
       type: String,
@@ -224,14 +224,14 @@ const orderSchema = new mongoose.Schema({
       note: String
     }]
   },
-  // Customer information
+  
   customer: {
     name: String,
     email: String,
     phone: String,
     isGuest: { type: Boolean, default: false }
   },
-  // Order notes and communication
+  
   notes: {
     customer: {
       type: String,
@@ -246,7 +246,7 @@ const orderSchema = new mongoose.Schema({
       default: ''
     }
   },
-  // Discounts and coupons
+  
   coupons: [{
     code: String,
     description: String,
@@ -258,7 +258,7 @@ const orderSchema = new mongoose.Schema({
     discountValue: Number,
     appliedAmount: Number
   }],
-  // Return and refund information
+  
   returns: [{
     items: [{
       productId: {
@@ -279,7 +279,7 @@ const orderSchema = new mongoose.Schema({
     refundAmount: Number,
     notes: String
   }],
-  // Order source and channel
+  
   source: {
     type: String,
     enum: ['website', 'mobile_app', 'phone', 'email', 'social_media', 'marketplace'],
@@ -289,7 +289,7 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: 'online'
   },
-  // Marketing and analytics
+  
   referralSource: {
     type: String,
     default: ''
@@ -302,7 +302,7 @@ const orderSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // Order priority and flags
+  
   priority: {
     type: String,
     enum: ['low', 'normal', 'high', 'urgent'],
@@ -320,7 +320,7 @@ const orderSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  // Timestamps
+  
   placedAt: {
     type: Date,
     default: Date.now
@@ -346,150 +346,149 @@ const orderSchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  // VULNERABILITY: Expose version key and internal fields
+  
   versionKey: '__v',
   timestamps: true
 });
 
-// VULNERABILITY: Generate predictable order numbers
+
 orderSchema.pre('save', function(next) {
   if (this.isNew && !this.orderNumber) {
-    // VULNERABILITY: Predictable order number generation
+    
     const timestamp = Date.now();
     const userId = this.userId.toString().slice(-4);
     this.orderNumber = `ORD-${userId}-${timestamp}`;
     
-    // VULNERABILITY: Log sensitive order information
+    
     console.log(`Creating new order: ${this.orderNumber}`);
     console.log(`Order details:`, this.toObject());
-    console.log(`Payment info:`, this.paymentInfo); // Sensitive data logging
+    console.log(`Payment info:`, this.paymentInfo); 
   }
   
   this.updatedAt = new Date();
   
-  // Call next to continue with save operation
+  
   if (typeof next === 'function') {
     next();
   }
 });
 
-// VULNERABILITY: Method that allows negative quantities (credit generation)
+
 orderSchema.methods.addItem = function(productId, quantity, price, name) {
-  // VULNERABILITY: No validation on quantity - allows negative values
+  
   this.items.push({
     productId: productId,
-    quantity: quantity, // Can be negative
+    quantity: quantity, 
     price: price,
     name: name
   });
   
-  // VULNERABILITY: Recalculate total without validation
+  
   this.recalculateTotal();
   return this.save();
 };
 
-// VULNERABILITY: Insecure total calculation
+
 orderSchema.methods.recalculateTotal = function() {
-  // VULNERABILITY: Simple calculation - allows negative totals
+  
   this.totalAmount = this.items.reduce((total, item) => {
     return total + (item.quantity * item.price);
   }, 0);
   
-  // VULNERABILITY: No validation of final total
+  
   return this.totalAmount;
 };
 
-// VULNERABILITY: Method that exposes sensitive payment data
+
 orderSchema.methods.getPaymentSummary = function() {
-  // VULNERABILITY: Return sensitive payment information
+  
   return {
-    cardNumber: this.paymentInfo.cardNumber, // Full card number exposed
+    cardNumber: this.paymentInfo.cardNumber, 
     expiryDate: this.paymentInfo.expiryDate,
-    cvv: this.paymentInfo.cvv, // CVV exposed
+    cvv: this.paymentInfo.cvv, 
     cardholderName: this.paymentInfo.cardholderName,
     totalAmount: this.totalAmount
   };
 };
 
-// VULNERABILITY: Static method with insecure direct object references
+
 orderSchema.statics.findByOrderNumber = async function(orderNumber) {
-  // VULNERABILITY: No access control - any user can access any order
+  
   return await this.findOne({ orderNumber: orderNumber })
-    .populate('userId', '+password +sessionToken') // Expose user sensitive data
+    .populate('userId', '+password +sessionToken') 
     .populate('items.productId');
 };
 
-// VULNERABILITY: Method that allows order manipulation
+
 orderSchema.methods.updateItemQuantity = function(itemIndex, newQuantity) {
-  // VULNERABILITY: No bounds checking or validation
+  
   if (this.items[itemIndex]) {
-    this.items[itemIndex].quantity = newQuantity; // Can be negative
+    this.items[itemIndex].quantity = newQuantity; 
     this.recalculateTotal();
   }
   return this.save();
 };
 
-// VULNERABILITY: Method that allows price manipulation
+
 orderSchema.methods.updateItemPrice = function(itemIndex, newPrice) {
-  // VULNERABILITY: No validation - allows arbitrary price changes
+  
   if (this.items[itemIndex]) {
-    this.items[itemIndex].price = newPrice; // Can be negative
+    this.items[itemIndex].price = newPrice; 
     this.recalculateTotal();
   }
   return this.save();
 };
 
-// VULNERABILITY: Static method that exposes all orders without access control
+
 orderSchema.statics.getAllOrdersWithSensitiveData = async function() {
-  // VULNERABILITY: No access control - exposes all order data
+  
   return await this.find({})
     .populate('userId', '+password +sessionToken +resetToken')
-    .select('+paymentInfo +__v'); // Expose sensitive fields
+    .select('+paymentInfo +__v'); 
 };
 
-// VULNERABILITY: Method for race condition exploitation
+
 orderSchema.statics.processPayment = async function(orderId, paymentData) {
-  // VULNERABILITY: No locking mechanism - allows race conditions
+  
   const order = await this.findById(orderId);
   
   if (!order) {
     throw new Error('Order not found');
   }
   
-  // VULNERABILITY: Simulate payment processing without proper concurrency control
-  await new Promise(resolve => setTimeout(resolve, 100)); // Simulate delay
   
-  // VULNERABILITY: Update payment info in plaintext
+  await new Promise(resolve => setTimeout(resolve, 100)); 
+  
+  
   order.paymentInfo = paymentData;
   order.status = 'processing';
   
   return await order.save();
 };
 
-// VULNERABILITY: Method that allows status manipulation
+
 orderSchema.methods.updateStatus = function(newStatus) {
-  // VULNERABILITY: No validation of status transitions
+  
   this.status = newStatus;
   return this.save();
 };
 
-// VULNERABILITY: Method that creates insecure order references
+
 orderSchema.methods.generateShareableLink = function() {
   // VULNERABILITY: Predictable sharing mechanism
   const baseUrl = 'https://vulnshop.com/orders/';
   return `${baseUrl}${this.orderNumber}?user=${this.userId}`;
 };
 
-// VULNERABILITY: Expose sensitive data in JSON
+
 orderSchema.methods.toJSON = function() {
   const order = this.toObject();
   
-  // VULNERABILITY: Don't remove sensitive payment fields
-  // Should remove paymentInfo.cardNumber, cvv, etc. but we don't
+  
+  
   return order;
 };
 
 const Order = mongoose.model('Order', orderSchema);
 
-module.exports = Order;/ /   O r d e r   m o d e l   i m p r o v e m e n t s  
- 
+module.exports = Order;

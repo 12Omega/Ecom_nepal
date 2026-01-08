@@ -4,7 +4,7 @@ const User = require('../models/User');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 
-// Admin dashboard
+
 router.get('/', (req, res) => {
   res.json({
     message: 'Admin Panel',
@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
   });
 });
 
-// Admin dashboard
+
 router.get('/dashboard', async (req, res) => {
   try {
     const userCount = await User.countDocuments();
@@ -41,7 +41,7 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-// Get all users (admin only)
+
 router.get('/users', async (req, res) => {
   try {
     const users = await User.find({}).select('-password');
@@ -58,7 +58,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// Get user by ID (admin only)
+
 router.get('/users/:userId', async (req, res) => {
   try {
     const user = await User.findById(req.params.userId).select('-password');
@@ -77,7 +77,7 @@ router.get('/users/:userId', async (req, res) => {
   }
 });
 
-// Update user role (admin only)
+
 router.put('/users/:userId/role', async (req, res) => {
   try {
     const { role } = req.body;
@@ -130,22 +130,22 @@ router.get('/console', (req, res) => {
   });
 });
 
-// VULNERABILITY: No authentication middleware - admin routes accessible to everyone
-// VULNERABILITY: Broken access control - no role verification
 
-// Admin dashboard - accessible to all users (VULNERABILITY)
+
+
+
 router.get('/dashboard', async (req, res) => {
   try {
-    // VULNERABILITY: Poor logging - no record of who accessed admin dashboard
-    poorLogger.log('Dashboard accessed');
-    // Missing: IP address, user agent, timestamp, user ID, etc.
     
-    // VULNERABILITY: Expose all sensitive system information
+    poorLogger.log('Dashboard accessed');
+    
+    
+    
     const userCount = await User.countDocuments();
     const productCount = await Product.countDocuments();
     const orderCount = await Order.countDocuments();
     
-    // VULNERABILITY: Expose all user data including passwords
+    
     const allUsers = await User.find({}).select('+password');
     const allOrders = await Order.find({}).populate('userId');
     
@@ -158,7 +158,7 @@ router.get('/dashboard', async (req, res) => {
         memory: process.memoryUsage(),
         pid: process.pid,
         cwd: process.cwd(),
-        env: process.env // VULNERABILITY: Expose all environment variables
+        env: process.env 
       },
       statistics: {
         totalUsers: userCount,
@@ -166,20 +166,20 @@ router.get('/dashboard', async (req, res) => {
         totalOrders: orderCount
       },
       sensitiveData: {
-        allUsers: allUsers, // VULNERABILITY: Expose all user data
-        allOrders: allOrders, // VULNERABILITY: Expose all order data
+        allUsers: allUsers, 
+        allOrders: allOrders, 
         databaseConnection: process.env.MONGODB_URI
       }
     });
   } catch (error) {
-    // VULNERABILITY: Verbose error messages exposing system details
+    
     poorLogger.log('Dashboard error occurred');
     res.status(500).json({
       error: 'Admin dashboard error - VERBOSE DETAILS EXPOSED',
       details: error.message,
-      stack: error.stack, // VULNERABILITY: Full stack trace
+      stack: error.stack, 
       query: req.query,
-      headers: req.headers, // VULNERABILITY: Request headers exposed
+      headers: req.headers, 
       systemInfo: {
         nodeVersion: process.version,
         platform: process.platform,
@@ -205,14 +205,14 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-// User management - no access control (VULNERABILITY)
+
 router.get('/users', async (req, res) => {
   try {
-    // VULNERABILITY: Poor logging - admin action not properly recorded
-    poorLogger.adminAction('users list accessed');
-    // Missing: who accessed it, when, from where, etc.
     
-    // VULNERABILITY: Return all users with passwords
+    poorLogger.adminAction('users list accessed');
+    
+    
+    
     const users = await User.find({}).select('+password');
     
     res.json({
@@ -222,7 +222,7 @@ router.get('/users', async (req, res) => {
       exposedFields: ['username', 'email', 'password', 'role', 'profile', 'sessionToken']
     });
   } catch (error) {
-    // VULNERABILITY: Verbose error with system details
+    
     poorLogger.log('Error in users endpoint');
     res.status(500).json({
       error: 'User listing error - SYSTEM DETAILS EXPOSED',
@@ -240,17 +240,17 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// Delete user - no authorization check (VULNERABILITY)
+
 router.delete('/users/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // VULNERABILITY: Critical admin action not logged properly
-    poorLogger.adminAction('user deletion attempt');
-    // Missing: which user was deleted, by whom, when, etc.
     
-    // VULNERABILITY: No verification if user is admin
-    // VULNERABILITY: No verification if user exists
+    poorLogger.adminAction('user deletion attempt');
+    
+    
+    
+    
     const deletedUser = await User.findByIdAndDelete(userId);
     
     res.json({
@@ -260,7 +260,7 @@ router.delete('/users/:userId', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    // VULNERABILITY: Verbose error exposing attempted operation details
+    
     poorLogger.log('User deletion failed');
     res.status(500).json({
       error: 'User deletion error - OPERATION DETAILS EXPOSED',
@@ -283,16 +283,16 @@ router.delete('/users/:userId', async (req, res) => {
   }
 });
 
-// Promote user to admin - accessible to everyone (VULNERABILITY)
+
 router.post('/users/:userId/promote', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // VULNERABILITY: Critical security action not logged
-    poorLogger.adminAction('user promotion');
-    // Missing: who was promoted, by whom, previous role, etc.
     
-    // VULNERABILITY: Anyone can promote any user to admin
+    poorLogger.adminAction('user promotion');
+    
+    
+    
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { role: 'admin' },
@@ -306,7 +306,7 @@ router.post('/users/:userId/promote', async (req, res) => {
       securityNote: 'This is a critical vulnerability!'
     });
   } catch (error) {
-    // VULNERABILITY: Verbose error with promotion attempt details
+    
     poorLogger.log('User promotion failed');
     res.status(500).json({
       error: 'User promotion error - ATTEMPT DETAILS EXPOSED',
@@ -322,24 +322,24 @@ router.post('/users/:userId/promote', async (req, res) => {
   }
 });
 
-// Product management with stored XSS vulnerability
+
 router.post('/products', async (req, res) => {
   try {
     const { name, description, price, category, imageUrl } = req.body;
     
-    // VULNERABILITY: Product creation not logged properly
-    poorLogger.adminAction('product created');
-    // Missing: what product, by whom, content details, etc.
     
-    // VULNERABILITY: No input sanitization - stored XSS
-    // VULNERABILITY: No admin verification
+    poorLogger.adminAction('product created');
+    
+    
+    
+    
     const product = new Product({
-      name: name, // XSS payload stored directly
-      description: description, // XSS payload stored directly
+      name: name, 
+      description: description, 
       price: price,
       category: category,
       imageUrl: imageUrl,
-      createdBy: req.body.createdBy || new require('mongoose').Types.ObjectId(), // Use provided or generate fake ObjectId
+      createdBy: req.body.createdBy || new require('mongoose').Types.ObjectId(), 
       stock: req.body.stock || 0
     });
     
@@ -352,13 +352,13 @@ router.post('/products', async (req, res) => {
       createdBy: 'Anyone - no admin check'
     });
   } catch (error) {
-    // VULNERABILITY: Verbose error with submitted data
+    
     poorLogger.log('Product creation failed');
     res.status(500).json({
       error: 'Product creation error - SUBMITTED DATA EXPOSED',
       details: error.message,
       stack: error.stack,
-      submittedData: req.body, // VULNERABILITY: Exposes potentially malicious input
+      submittedData: req.body, 
       validationErrors: error.errors,
       systemInfo: {
         timestamp: new Date().toISOString(),
@@ -369,21 +369,21 @@ router.post('/products', async (req, res) => {
   }
 });
 
-// Update product with stored XSS (VULNERABILITY)
+
 router.put('/products/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
     const updateData = req.body;
     
-    // VULNERABILITY: Product update not logged
-    poorLogger.adminAction('product updated');
-    // Missing: which product, what changed, by whom, etc.
     
-    // VULNERABILITY: No input sanitization
-    // VULNERABILITY: No admin verification
+    poorLogger.adminAction('product updated');
+    
+    
+    
+    
     const updatedProduct = await Product.findByIdAndUpdate(
       productId,
-      updateData, // Direct update without sanitization
+      updateData, 
       { new: true }
     );
     
@@ -394,13 +394,13 @@ router.put('/products/:productId', async (req, res) => {
       updatedBy: 'Anyone - no authorization'
     });
   } catch (error) {
-    // VULNERABILITY: Verbose error with update details
+    
     poorLogger.log('Product update failed');
     res.status(500).json({
       error: 'Product update error - UPDATE DETAILS EXPOSED',
       details: error.message,
       stack: error.stack,
-      updateData: req.body, // VULNERABILITY: Exposes update attempt
+      updateData: req.body, 
       productId: req.params.productId,
       operationDetails: {
         method: 'findByIdAndUpdate',
@@ -411,15 +411,15 @@ router.put('/products/:productId', async (req, res) => {
   }
 });
 
-// System configuration - exposed to all (VULNERABILITY)
+
 router.get('/config', (req, res) => {
-  // VULNERABILITY: Configuration access not logged
+  
   poorLogger.log('Config accessed');
-  // Missing: who accessed sensitive config, when, from where
+  
   
   res.json({
     message: 'System configuration exposed to everyone!',
-    environment: process.env, // VULNERABILITY: All environment variables exposed
+    environment: process.env, 
     config: {
       database: process.env.MONGODB_URI,
       jwtSecret: process.env.JWT_SECRET || 'default-weak-secret',
@@ -451,14 +451,14 @@ router.get('/config', (req, res) => {
   });
 });
 
-// Database operations - no access control (VULNERABILITY)
+
 router.get('/database/users', async (req, res) => {
   try {
-    // VULNERABILITY: Database access not logged
-    poorLogger.log('Database users accessed');
-    // Missing: security implications of direct DB access
     
-    // VULNERABILITY: Direct database access without authorization
+    poorLogger.log('Database users accessed');
+    
+    
+    
     const users = await User.find({}).select('+password');
     
     res.json({
@@ -467,7 +467,7 @@ router.get('/database/users', async (req, res) => {
       warning: 'Passwords exposed in plaintext or weak hash'
     });
   } catch (error) {
-    // VULNERABILITY: Database error with connection details
+    
     poorLogger.log('Database access failed');
     res.status(500).json({
       error: 'Database access error - CONNECTION DETAILS EXPOSED',
@@ -486,16 +486,16 @@ router.get('/database/users', async (req, res) => {
   }
 });
 
-// Execute arbitrary database queries (VULNERABILITY)
+
 router.post('/database/query', async (req, res) => {
   try {
     const { collection, operation, query, update } = req.body;
     
-    // VULNERABILITY: Arbitrary database operations not logged properly
-    poorLogger.adminAction('database query executed');
-    // Missing: what query, on which collection, by whom, potential impact
     
-    // VULNERABILITY: Allow arbitrary database operations
+    poorLogger.adminAction('database query executed');
+    
+    
+    
     let result;
     const db = require('mongoose').connection.db;
     
@@ -522,13 +522,13 @@ router.post('/database/query', async (req, res) => {
       warning: 'This allows complete database manipulation'
     });
   } catch (error) {
-    // VULNERABILITY: Query execution error with full details
+    
     poorLogger.log('Database query failed');
     res.status(500).json({
       error: 'Database query error - QUERY DETAILS EXPOSED',
       details: error.message,
       stack: error.stack,
-      submittedQuery: req.body, // VULNERABILITY: Exposes potentially malicious query
+      submittedQuery: req.body, 
       databaseState: {
         readyState: require('mongoose').connection.readyState,
         collections: require('mongoose').connection.db ? 
@@ -543,7 +543,7 @@ router.post('/database/query', async (req, res) => {
   }
 });
 
-// VULNERABILITY: Add more predictable admin endpoints for discovery
+
 router.get('/logs', (req, res) => {
   poorLogger.log('Logs accessed');
   res.json({
@@ -581,5 +581,4 @@ router.get('/maintenance', (req, res) => {
   });
 });
 
-module.exports = router;/ /   A d m i n   f u n c t i o n a l i t y  
- 
+module.exports = router;

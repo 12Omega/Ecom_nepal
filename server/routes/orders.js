@@ -5,14 +5,14 @@ const Product = require('../models/Product');
 const User = require('../models/User');
 const router = express.Router();
 
-// VULNERABILITY: No authentication middleware - anyone can access orders
 
-// Get order history for a user
+
+
 router.get('/history', async (req, res) => {
   try {
     const { userId, status, dateRange, sortBy = 'newest', page = 1, limit = 10 } = req.query;
     
-    // VULNERABILITY: No access control - any user can view any user's orders
+    
     let query = {};
     
     if (userId) {
@@ -23,7 +23,7 @@ router.get('/history', async (req, res) => {
       query.status = status;
     }
     
-    // Date range filtering
+    
     if (dateRange && dateRange !== 'all') {
       const now = new Date();
       const filterDate = new Date();
@@ -48,7 +48,7 @@ router.get('/history', async (req, res) => {
       }
     }
     
-    // Sorting
+    
     let sortOptions = {};
     switch (sortBy) {
       case 'newest':
@@ -80,7 +80,7 @@ router.get('/history', async (req, res) => {
       .select('orderNumber status totalAmount placedAt estimatedDelivery trackingNumber items')
       .exec();
     
-    // Transform orders for summary view
+    
     const orderSummaries = orders.map(order => ({
       _id: order._id,
       orderNumber: order.orderNumber,
@@ -121,17 +121,17 @@ router.get('/history', async (req, res) => {
     res.status(500).json({
       error: 'Failed to fetch order history',
       message: error.message,
-      stack: error.stack // VULNERABILITY: Expose stack trace
+      stack: error.stack 
     });
   }
 });
 
-// Get detailed order information
+
 router.get('/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // VULNERABILITY: No access control - any user can view any order
+    
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({
         error: 'Invalid order ID format'
@@ -152,7 +152,7 @@ router.get('/:orderId', async (req, res) => {
       });
     }
     
-    // VULNERABILITY: Expose all order data including sensitive payment info
+    
     res.json({
       success: true,
       order: order,
@@ -174,7 +174,7 @@ router.get('/:orderId', async (req, res) => {
   }
 });
 
-// Get order tracking information
+
 router.get('/:orderId/tracking', async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -187,7 +187,7 @@ router.get('/:orderId/tracking', async (req, res) => {
       });
     }
     
-    // Mock tracking data - in real app, this would integrate with shipping providers
+    
     const mockTrackingEvents = [
       {
         date: new Date('2024-01-20T10:00:00Z'),
@@ -235,13 +235,13 @@ router.get('/:orderId/tracking', async (req, res) => {
   }
 });
 
-// Cancel order
+
 router.post('/:orderId/cancel', async (req, res) => {
   try {
     const { orderId } = req.params;
     const { reason } = req.body;
     
-    // VULNERABILITY: No authentication or authorization check
+    
     const order = await Order.findById(orderId);
     
     if (!order) {
@@ -250,7 +250,7 @@ router.post('/:orderId/cancel', async (req, res) => {
       });
     }
     
-    // Check if order can be cancelled
+    
     if (!['pending', 'confirmed', 'processing'].includes(order.status)) {
       return res.status(400).json({
         error: 'Order cannot be cancelled',
@@ -258,19 +258,19 @@ router.post('/:orderId/cancel', async (req, res) => {
       });
     }
     
-    // Update order status
+    
     order.status = 'cancelled';
     order.cancelledAt = new Date();
     order.statusHistory.push({
       status: 'cancelled',
       timestamp: new Date(),
       note: reason || 'Cancelled by customer',
-      updatedBy: null // VULNERABILITY: No user tracking
+      updatedBy: null 
     });
     
     await order.save();
     
-    // VULNERABILITY: Log sensitive order information
+    
     console.log('Order cancelled:', {
       orderId: orderId,
       userId: order.userId,
@@ -300,13 +300,13 @@ router.post('/:orderId/cancel', async (req, res) => {
   }
 });
 
-// Request return
+
 router.post('/:orderId/return', async (req, res) => {
   try {
     const { orderId } = req.params;
     const { itemId, reason } = req.body;
     
-    // VULNERABILITY: No authentication check
+    
     const order = await Order.findById(orderId);
     
     if (!order) {
@@ -315,7 +315,7 @@ router.post('/:orderId/return', async (req, res) => {
       });
     }
     
-    // Check if order is eligible for return
+    
     if (order.status !== 'delivered') {
       return res.status(400).json({
         error: 'Order must be delivered to request return',
@@ -323,7 +323,7 @@ router.post('/:orderId/return', async (req, res) => {
       });
     }
     
-    // Find the item
+    
     const item = order.items.find(item => item._id.toString() === itemId);
     if (!item) {
       return res.status(404).json({
@@ -331,7 +331,7 @@ router.post('/:orderId/return', async (req, res) => {
       });
     }
     
-    // Add return request
+    
     order.returns.push({
       items: [{
         productId: item.productId,
@@ -367,12 +367,12 @@ router.post('/:orderId/return', async (req, res) => {
   }
 });
 
-// Reorder items from previous order
+
 router.post('/:orderId/reorder', async (req, res) => {
   try {
     const { orderId } = req.params;
     
-    // VULNERABILITY: No authentication check
+    
     const order = await Order.findById(orderId).populate('items.productId');
     
     if (!order) {
@@ -381,7 +381,7 @@ router.post('/:orderId/reorder', async (req, res) => {
       });
     }
     
-    // Check product availability and add to cart
+    
     const availableItems = [];
     const unavailableItems = [];
     
@@ -393,7 +393,7 @@ router.post('/:orderId/reorder', async (req, res) => {
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantity,
-          price: product.price // Use current price
+          price: product.price 
         });
       } else {
         unavailableItems.push({
@@ -407,7 +407,7 @@ router.post('/:orderId/reorder', async (req, res) => {
       }
     }
     
-    // VULNERABILITY: Log reorder activity
+    
     console.log('Reorder request:', {
       orderId: orderId,
       userId: order.userId,
@@ -436,13 +436,13 @@ router.post('/:orderId/reorder', async (req, res) => {
   }
 });
 
-// Update order status (admin function)
+
 router.patch('/:orderId/status', async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status, note } = req.body;
     
-    // VULNERABILITY: No admin authentication check
+    
     const order = await Order.findById(orderId);
     
     if (!order) {
@@ -464,20 +464,20 @@ router.patch('/:orderId/status', async (req, res) => {
       });
     }
     
-    // Update order status
+    
     const previousStatus = order.status;
     order.status = status;
     order.updatedAt = new Date();
     
-    // Add to status history
+    
     order.statusHistory.push({
       status: status,
       timestamp: new Date(),
       note: note || `Status changed from ${previousStatus} to ${status}`,
-      updatedBy: null // VULNERABILITY: No user tracking
+      updatedBy: null 
     });
     
-    // Update specific timestamps based on status
+    
     switch (status) {
       case 'confirmed':
         order.confirmedAt = new Date();
@@ -516,19 +516,19 @@ router.patch('/:orderId/status', async (req, res) => {
   }
 });
 
-// Get order statistics
+
 router.get('/stats/summary', async (req, res) => {
   try {
     const { userId, dateRange } = req.query;
     
-    // VULNERABILITY: No access control - expose all order statistics
+    
     let matchQuery = {};
     
     if (userId) {
       matchQuery.userId = mongoose.Types.ObjectId(userId);
     }
     
-    // Date range filtering
+    
     if (dateRange) {
       const now = new Date();
       const startDate = new Date();
@@ -547,7 +547,7 @@ router.get('/stats/summary', async (req, res) => {
           startDate.setFullYear(now.getFullYear() - 1);
           break;
         default:
-          startDate.setFullYear(2020); // All time
+          startDate.setFullYear(2020); 
       }
       
       matchQuery.placedAt = { $gte: startDate };
@@ -577,7 +577,7 @@ router.get('/stats/summary', async (req, res) => {
       }
     ]);
     
-    // Status breakdown
+    
     const statusCounts = {};
     if (stats.length > 0 && stats[0].statusBreakdown) {
       stats[0].statusBreakdown.forEach(status => {
@@ -615,5 +615,4 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
-module.exports = router;/ /   O r d e r   m a n a g e m e n t  
- 
+module.exports = router;

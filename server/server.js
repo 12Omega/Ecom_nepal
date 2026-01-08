@@ -12,6 +12,9 @@ const PORT = process.env.PORT || 5000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Raw body parser for Stripe webhooks (must be before other middleware)
+app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
+
 // Serve static files
 app.use('/uploads', express.static('uploads'));
 
@@ -40,9 +43,11 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"]
+      styleSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+      scriptSrc: ["'self'", "https://js.stripe.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.stripe.com"],
+      frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com"]
     }
   }
 }));
@@ -69,6 +74,7 @@ const adminRoutes = require('./routes/admin');
 const adminDashboardRoutes = require('./routes/admin-dashboard');
 const apiRoutes = require('./routes/api');
 const stripeRoutes = require('./routes/stripe');
+const paymentRoutes = require('./routes/payment');
 
 // Mount routes
 app.use('/api/auth', authRoutes);
@@ -80,6 +86,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin', adminDashboardRoutes);
 app.use('/api', apiRoutes);
 app.use('/api/stripe', stripeRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -104,18 +111,6 @@ app.get('/api/placeholder/:width/:height', (req, res) => {
   
   res.setHeader('Content-Type', 'image/svg+xml');
   res.send(svg);
-});
-  res.setHeader('X-Vulnerability', 'POODLE');
-  res.setHeader('X-CVE', 'CVE-2014-3566');
-  
-  res.json({
-    message: 'SSLv3 protocol test',
-    protocol: 'SSLv3',
-    vulnerability: 'POODLE attack possible',
-    description: 'Padding Oracle On Downgraded Legacy Encryption',
-    mitigation: 'Disable SSLv3 protocol',
-    timestamp: new Date().toISOString()
-  });
 });
 
 // Basic route

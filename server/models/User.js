@@ -1,31 +1,31 @@
 const mongoose = require('mongoose');
 
-// Enhanced User schema with comprehensive profile details
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
     unique: true,
-    // No input validation - allows injection attacks
+    
   },
   email: {
     type: String,
     required: true,
     unique: true,
-    // No email validation - vulnerability
+    
   },
   password: {
     type: String,
     required: true,
-    // VULNERABILITY: Stored in plaintext - no hashing
+    
   },
   role: {
     type: String,
     enum: ['user', 'admin', 'moderator', 'vendor'],
     default: 'user',
-    // VULNERABILITY: Can be modified by users through mass assignment
+    
   },
-  // Enhanced profile information
+  
   profile: {
     firstName: {
       type: String,
@@ -60,7 +60,7 @@ const userSchema = new mongoose.Schema({
       type: String,
       default: ''
     },
-    // Contact information
+    
     phone: {
       type: String,
       default: ''
@@ -73,7 +73,7 @@ const userSchema = new mongoose.Schema({
       type: String,
       default: ''
     },
-    // Address information
+    
     addresses: [{
       type: {
         type: String,
@@ -89,12 +89,12 @@ const userSchema = new mongoose.Schema({
       isDefault: { type: Boolean, default: false },
       isActive: { type: Boolean, default: true }
     }],
-    // Legacy address field for backward compatibility
+    
     address: {
       type: String,
       default: ''
     },
-    // Location details
+    
     country: {
       type: String,
       default: ''
@@ -115,7 +115,7 @@ const userSchema = new mongoose.Schema({
       type: String,
       default: 'UTC'
     },
-    // Preferences
+    
     preferences: {
       language: {
         type: String,
@@ -152,7 +152,7 @@ const userSchema = new mongoose.Schema({
         color: String
       }
     },
-    // Social media links
+    
     socialMedia: {
       facebook: String,
       twitter: String,
@@ -161,7 +161,7 @@ const userSchema = new mongoose.Schema({
       youtube: String
     }
   },
-  // Account status and security
+  
   accountStatus: {
     type: String,
     enum: ['active', 'inactive', 'suspended', 'banned', 'pending_verification'],
@@ -183,7 +183,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // Loyalty and rewards
+  
   loyaltyPoints: {
     type: Number,
     default: 0
@@ -201,14 +201,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  // Profile completion
+  
   profileCompleteness: {
     type: Number,
     default: 0,
     min: 0,
     max: 100
   },
-  // Activity tracking
+  
   lastLogin: {
     type: Date
   },
@@ -220,7 +220,7 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  // Wishlist and favorites
+  
   wishlist: [{
     productId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -242,7 +242,7 @@ const userSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  // Payment methods
+  
   paymentMethods: [{
     type: {
       type: String,
@@ -257,14 +257,14 @@ const userSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true },
     addedAt: { type: Date, default: Date.now }
   }],
-  // Session and security tokens
+  
   sessionToken: {
     type: String,
-    // VULNERABILITY: Predictable session tokens
+    
   },
   resetToken: {
     type: String,
-    // VULNERABILITY: Predictable reset tokens
+    
   },
   resetTokenExpiry: {
     type: Date
@@ -275,7 +275,7 @@ const userSchema = new mongoose.Schema({
   emailVerificationExpiry: {
     type: Date
   },
-  // Subscription and newsletter
+  
   subscriptions: [{
     type: String,
     subscribedAt: { type: Date, default: Date.now }
@@ -283,7 +283,7 @@ const userSchema = new mongoose.Schema({
   unsubscribeToken: {
     type: String
   },
-  // Analytics and tracking
+  
   referralCode: {
     type: String,
     unique: true,
@@ -297,7 +297,7 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  // Metadata
+  
   createdAt: {
     type: Date,
     default: Date.now
@@ -307,88 +307,87 @@ const userSchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  // VULNERABILITY: Expose version key and internal fields
+  
   versionKey: '__v',
   timestamps: true
 });
 
-// VULNERABILITY: Predictable session token generation
+
 userSchema.methods.generateSessionToken = function() {
-  // Predictable token based on user ID and timestamp
+  
   const timestamp = Date.now();
   const userId = this._id.toString();
   
-  // Simple concatenation - easily predictable
+  
   this.sessionToken = `session_${userId}_${timestamp}`;
   return this.sessionToken;
 };
 
-// VULNERABILITY: Predictable reset token generation
+
 userSchema.methods.generateResetToken = function() {
-  // Predictable reset token
+  
   const timestamp = Date.now();
   const userId = this._id.toString();
   
-  // Simple pattern - easily guessable
+  
   this.resetToken = `reset_${userId}_${timestamp}`;
-  this.resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+  this.resetTokenExpiry = new Date(Date.now() + 3600000); 
   
   return this.resetToken;
 };
 
-// VULNERABILITY: Weak password validation
+
 userSchema.methods.validatePassword = function(password) {
-  // Direct comparison - no hashing
+  
   return this.password === password;
 };
 
-// VULNERABILITY: Expose sensitive data in JSON
+
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   
-  // VULNERABILITY: Don't remove sensitive fields
-  // Should remove password, sessionToken, resetToken but we don't
+  
+  
   return user;
 };
 
-// VULNERABILITY: Static method that allows SQL-like injection
+
 userSchema.statics.findByCredentials = async function(username, password) {
   try {
-    // VULNERABILITY: Direct query construction - allows NoSQL injection
+    
     const query = { username: username };
     const user = await this.findOne(query);
     
     if (!user) {
-      // VULNERABILITY: User enumeration through different error messages
+      
       throw new Error('User not found');
     }
     
-    // VULNERABILITY: Direct password comparison
+    
     if (user.password !== password) {
       throw new Error('Invalid password');
     }
     
     return user;
   } catch (error) {
-    // VULNERABILITY: Expose detailed error information
+    
     console.error('Authentication error details:', error);
     throw error;
   }
 };
 
-// VULNERABILITY: Method to escalate privileges
+
 userSchema.methods.makeAdmin = function() {
   this.role = 'admin';
   return this.save();
 };
 
-// VULNERABILITY: Static method with weak access control
+
 userSchema.statics.getAllUsers = async function() {
-  // VULNERABILITY: No access control - any user can call this
-  return await this.find({}).select('+password +sessionToken'); // Expose sensitive fields
+  
+  return await this.find({}).select('+password +sessionToken'); 
 };
 
 const User = mongoose.model('User', userSchema);
 
-module.exports = User;/ /   A d d e d   u s e r   v a l i d a t i o n  
- 
+module.exports = User;

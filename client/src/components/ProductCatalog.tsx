@@ -1,289 +1,297 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import './ProductCatalog.css';
+import React, { useState } from 'react';
+import { useCart } from '../App';
 
-interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  imageUrl?: string;
-  category: string;
-  rating?: number;
-  reviews?: number;
-  inStock?: boolean;
-  originalPrice?: number;
-}
+// Extended product catalog for Nepal-themed e-commerce
+const allProducts = [
+  {
+    id: '1',
+    name: 'Traditional Nepali Khukuri',
+    price: 89.99,
+    image: '/api/placeholder/300/200',
+    description: 'Authentic handcrafted Khukuri knife from Nepal. Perfect for collectors and outdoor enthusiasts.',
+    category: 'Traditional'
+  },
+  {
+    id: '2', 
+    name: 'Himalayan Singing Bowl',
+    price: 45.99,
+    image: '/api/placeholder/300/200',
+    description: 'Handmade singing bowl for meditation and sound therapy. Creates beautiful resonant tones.',
+    category: 'Spiritual'
+  },
+  {
+    id: '3',
+    name: 'Pashmina Shawl',
+    price: 129.99,
+    image: '/api/placeholder/300/200',
+    description: 'Luxurious cashmere pashmina from Nepal. Soft, warm, and elegantly crafted.',
+    category: 'Fashion'
+  },
+  {
+    id: '4',
+    name: 'Prayer Flags Set',
+    price: 24.99,
+    image: '/api/placeholder/300/200',
+    description: 'Colorful Tibetan prayer flags with traditional mantras. Bring peace and positive energy.',
+    category: 'Spiritual'
+  },
+  {
+    id: '5',
+    name: 'Nepali Tea Collection',
+    price: 34.99,
+    image: '/api/placeholder/300/200',
+    description: 'Premium tea collection from the hills of Nepal. Includes black, green, and herbal varieties.',
+    category: 'Food'
+  },
+  {
+    id: '6',
+    name: 'Handwoven Dhaka Topi',
+    price: 19.99,
+    image: '/api/placeholder/300/200',
+    description: 'Traditional Nepali cap made from handwoven Dhaka fabric. Cultural heritage wear.',
+    category: 'Fashion'
+  },
+  {
+    id: '7',
+    name: 'Brass Buddha Statue',
+    price: 67.99,
+    image: '/api/placeholder/300/200',
+    description: 'Beautiful brass Buddha statue for meditation and home decoration. Handcrafted in Nepal.',
+    category: 'Spiritual'
+  },
+  {
+    id: '8',
+    name: 'Yak Wool Blanket',
+    price: 156.99,
+    image: '/api/placeholder/300/200',
+    description: 'Warm and durable yak wool blanket from the Himalayas. Perfect for cold weather.',
+    category: 'Home'
+  },
+  {
+    id: '9',
+    name: 'Nepali Spice Set',
+    price: 28.99,
+    image: '/api/placeholder/300/200',
+    description: 'Authentic Nepali spices including timur, jimbu, and other traditional seasonings.',
+    category: 'Food'
+  }
+];
+
+const categories = ['All', 'Traditional', 'Spiritual', 'Fashion', 'Food', 'Home'];
 
 const ProductCatalog: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { addToCart } = useCart();
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('');
-  const [sortBy, setSortBy] = useState('name');
-  const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  useEffect(() => {
-    // Get initial values from URL params
-    const search = searchParams.get('search') || '';
-    const cat = searchParams.get('category') || '';
-    setSearchTerm(search);
-    setCategory(cat);
-  }, [searchParams]);
-
-  useEffect(() => {
-    fetchProducts();
-  }, [searchTerm, category, sortBy, currentPage]);
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      let url = '/api/products';
-      const params = new URLSearchParams();
-      
-      if (searchTerm) params.append('search', searchTerm);
-      if (category) params.append('category', category);
-      if (sortBy) params.append('sort', sortBy);
-      params.append('page', currentPage.toString());
-      params.append('limit', '12');
-      
-      if (params.toString()) {
-        url += '?' + params.toString();
-      }
-
-      const response = await fetch(url);
-      const data = await response.json();
-      setProducts(data.products || []);
-      setTotalPages(data.totalPages || 1);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addToCart = async (productId: string) => {
-    try {
-      const response = await fetch('/api/cart/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ productId, quantity: 1 }),
-      });
-
-      if (response.ok) {
-        alert('Product added to cart!');
-      } else {
-        alert('Failed to add product to cart');
-      }
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-      alert('Error adding to cart');
-    }
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
-    fetchProducts();
-  };
-
-  const categories = [
-    { value: '', label: 'All Categories' },
-    { value: 'clothing', label: 'Traditional Clothing' },
-    { value: 'handicrafts', label: 'Handicrafts' },
-    { value: 'food', label: 'Food & Spices' },
-    { value: 'jewelry', label: 'Jewelry & Accessories' },
-    { value: 'art', label: 'Art & Culture' },
-    { value: 'home', label: 'Home & Decor' },
-    { value: 'books', label: 'Books & Literature' },
-    { value: 'instruments', label: 'Musical Instruments' },
-    { value: 'accessories', label: 'Accessories' },
-    { value: 'beverages', label: 'Beverages' },
-  ];
-
-  const sortOptions = [
-    { value: 'name', label: 'Name A-Z' },
-    { value: '-name', label: 'Name Z-A' },
-    { value: 'price', label: 'Price: Low to High' },
-    { value: '-price', label: 'Price: High to Low' },
-    { value: '-rating', label: 'Highest Rated' },
-    { value: '-createdAt', label: 'Newest First' },
-  ];
-
-  if (loading) {
-    return (
-      <div className="product-catalog">
-        <div className="loading">
-          <div className="spinner"></div>
-          <p>Loading products...</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredProducts = allProducts.filter(product => {
+    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
-    <div className="product-catalog">
-      <div className="catalog-header">
-        <h1>Product Catalog</h1>
-        <p>Discover our amazing collection of products</p>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <h1>🛍️ Product Catalog</h1>
+        <p style={{ color: '#666', fontSize: '1.1rem' }}>
+          Discover authentic Nepali products with secure Stripe checkout
+        </p>
       </div>
 
-      <div className="catalog-controls">
-        <div className="filters-section">
-          <form onSubmit={handleSearch} className="search-form">
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="search-btn">
-              🔍 Search
+      {/* Search and Filter */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '20px', 
+        marginBottom: '30px',
+        background: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <div>
+          <input
+            type="text"
+            placeholder="🔍 Search products..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #ddd',
+              borderRadius: '6px',
+              fontSize: '16px',
+              boxSizing: 'border-box'
+            }}
+          />
+        </div>
+        
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {categories.map(category => (
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                borderRadius: '20px',
+                background: selectedCategory === category ? '#0570de' : '#f0f0f0',
+                color: selectedCategory === category ? 'white' : '#333',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              {category}
             </button>
-          </form>
-
-          <div className="filter-controls">
-            <select 
-              value={category} 
-              onChange={(e) => setCategory(e.target.value)}
-              className="filter-select"
-            >
-              {categories.map(cat => (
-                <option key={cat.value} value={cat.value}>
-                  {cat.label}
-                </option>
-              ))}
-            </select>
-
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value)}
-              className="sort-select"
-            >
-              {sortOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="results-info">
-          <p>{products.length} products found</p>
-        </div>
-      </div>
-
-      <div className="catalog-content">
-        <div className="products-grid">
-          {products.map((product) => (
-            <div key={product._id} className="product-card">
-              <div className="product-image">
-                <img 
-                  src={product.image || product.imageUrl || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=300&fit=crop'} 
-                  alt={product.name}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=300&fit=crop';
-                  }}
-                />
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <div className="discount-badge">
-                    -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}%
-                  </div>
-                )}
-                {!product.inStock && (
-                  <div className="out-of-stock-badge">Out of Stock</div>
-                )}
-              </div>
-              
-              <div className="product-info">
-                <div className="product-category">{product.category}</div>
-                <h3 className="product-name">
-                  <Link to={`/product/${product._id}`}>
-                    {product.name}
-                  </Link>
-                </h3>
-                <p className="product-description">{product.description}</p>
-                
-                <div className="product-rating">
-                  <span className="stars">
-                    {'★'.repeat(Math.floor(product.rating || 4))}
-                    {'☆'.repeat(5 - Math.floor(product.rating || 4))}
-                  </span>
-                  <span className="rating-text">
-                    ({product.rating || 4.0}) • {product.reviews || 0} reviews
-                  </span>
-                </div>
-
-                <div className="product-price">
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <span className="original-price">${product.originalPrice}</span>
-                  )}
-                  <span className="current-price">${product.price}</span>
-                </div>
-
-                <div className="product-actions">
-                  <button 
-                    onClick={() => addToCart(product._id)}
-                    className={`add-to-cart-btn ${!product.inStock ? 'disabled' : ''}`}
-                    disabled={!product.inStock}
-                  >
-                    {product.inStock ? '🛒 Add to Cart' : 'Out of Stock'}
-                  </button>
-                  <Link to={`/product/${product._id}`} className="view-details-btn">
-                    View Details
-                  </Link>
-                </div>
-              </div>
-            </div>
           ))}
         </div>
+      </div>
 
-        {products.length === 0 && (
-          <div className="no-products">
-            <div className="no-products-icon">📦</div>
-            <h3>No products found</h3>
-            <p>Try adjusting your search criteria or browse different categories.</p>
-            <Link to="/products" className="btn btn-primary">
-              View All Products
-            </Link>
-          </div>
-        )}
-
-        {totalPages > 1 && (
-          <div className="pagination">
-            <button 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="pagination-btn"
-            >
-              ← Previous
-            </button>
-            
-            <div className="pagination-info">
-              Page {currentPage} of {totalPages}
+      {/* Products Grid */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+        gap: '20px',
+        marginBottom: '30px'
+      }}>
+        {filteredProducts.map(product => (
+          <div key={product.id} style={{ 
+            background: 'white', 
+            borderRadius: '8px', 
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            overflow: 'hidden',
+            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-5px)';
+            e.currentTarget.style.boxShadow = '0 5px 20px rgba(0,0,0,0.15)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+          }}
+          >
+            <div style={{ 
+              height: '200px', 
+              background: `linear-gradient(45deg, #f0f0f0, #e0e0e0)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '4rem',
+              position: 'relative'
+            }}>
+              🇳🇵
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                right: '10px',
+                background: '#0570de',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}>
+                {product.category}
+              </div>
             </div>
-            
-            <button 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="pagination-btn"
-            >
-              Next →
-            </button>
+            <div style={{ padding: '20px' }}>
+              <h3 style={{ margin: '0 0 10px 0', color: '#333', fontSize: '1.2rem' }}>
+                {product.name}
+              </h3>
+              <p style={{ 
+                color: '#666', 
+                margin: '0 0 15px 0', 
+                fontSize: '14px',
+                lineHeight: '1.4',
+                height: '40px',
+                overflow: 'hidden'
+              }}>
+                {product.description}
+              </p>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center' 
+              }}>
+                <span style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: '600', 
+                  color: '#0570de' 
+                }}>
+                  ${product.price}
+                </span>
+                <button
+                  onClick={() => {
+                    addToCart(product);
+                    // Visual feedback
+                    const button = document.activeElement as HTMLButtonElement;
+                    if (button) {
+                      const originalText = button.textContent;
+                      button.textContent = '✅ Added!';
+                      button.style.background = '#28a745';
+                      setTimeout(() => {
+                        button.textContent = originalText;
+                        button.style.background = 'linear-gradient(135deg, #0570de 0%, #1a88ff 100%)';
+                      }, 1000);
+                    }
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #0570de 0%, #1a88ff 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  🛒 Add to Cart
+                </button>
+              </div>
+            </div>
           </div>
-        )}
+        ))}
+      </div>
+
+      {filteredProducts.length === 0 && (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '60px 20px',
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🔍</div>
+          <h3>No products found</h3>
+          <p style={{ color: '#666' }}>
+            Try adjusting your search or filter criteria
+          </p>
+        </div>
+      )}
+
+      {/* Stripe Integration Notice */}
+      <div style={{ 
+        marginTop: '40px',
+        padding: '30px',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: '8px',
+        textAlign: 'center',
+        color: 'white'
+      }}>
+        <h3>💳 Secure Checkout Ready</h3>
+        <p style={{ margin: '10px 0', opacity: 0.9 }}>
+          Add items to your cart and checkout securely with Stripe payment processing
+        </p>
       </div>
     </div>
   );
 };
 
-export default ProductCatalog;/ /   P r o d u c t   c a t a l o g   U I  
- 
+export default ProductCatalog;

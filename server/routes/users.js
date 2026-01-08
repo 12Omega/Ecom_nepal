@@ -6,21 +6,21 @@ const User = require('../models/User');
 const { upload, uploadMiddleware } = require('../middleware/upload');
 const router = express.Router();
 
-// VULNERABILITY: No authentication middleware - anyone can access these routes
 
-// Get user profile by ID (IDOR vulnerability)
+
+
 router.get('/profile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // VULNERABILITY: No access control - any user can view any profile
-    // Should check if the requesting user is the owner or has admin privileges
     
-    // VULNERABILITY: Direct object reference without validation
+    
+    
+    
     const user = await User.findById(userId);
     
     if (!user) {
-      // VULNERABILITY: Verbose error message reveals system information
+      
       return res.status(404).json({
         error: 'User not found',
         requestedId: userId,
@@ -32,10 +32,10 @@ router.get('/profile/:userId', async (req, res) => {
       });
     }
     
-    // VULNERABILITY: Return all user data including sensitive information
+    
     res.json({
       success: true,
-      user: user, // Includes password, sessionToken, etc.
+      user: user, 
       metadata: {
         requestedBy: req.ip,
         timestamp: new Date().toISOString(),
@@ -44,7 +44,7 @@ router.get('/profile/:userId', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Expose detailed error information
+    
     console.error('Profile fetch error:', error);
     res.status(500).json({
       error: 'Internal server error',
@@ -56,30 +56,30 @@ router.get('/profile/:userId', async (req, res) => {
   }
 });
 
-// Update user profile (CSRF vulnerability)
+
 router.put('/profile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const updateData = req.body;
     
-    // VULNERABILITY: No CSRF protection
-    // VULNERABILITY: No authentication check
-    // VULNERABILITY: Mass assignment - allows updating any field
+    
+    
+    
     
     console.log(`Profile update attempt for user ${userId}:`, updateData);
     
-    // VULNERABILITY: Allow updating sensitive fields like role, password
+    
     const user = await User.findByIdAndUpdate(
       userId,
-      updateData, // Direct assignment without filtering
+      updateData, 
       { 
         new: true,
-        runValidators: false // VULNERABILITY: Skip validation
+        runValidators: false 
       }
     );
     
     if (!user) {
-      // VULNERABILITY: Verbose error with system details
+      
       return res.status(404).json({
         error: 'User not found for update',
         requestedId: userId,
@@ -91,7 +91,7 @@ router.put('/profile/:userId', async (req, res) => {
       });
     }
     
-    // VULNERABILITY: Return updated user with all sensitive data
+    
     res.json({
       success: true,
       message: 'Profile updated successfully',
@@ -105,7 +105,7 @@ router.put('/profile/:userId', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Detailed error exposure
+    
     console.error('Profile update error:', error);
     res.status(500).json({
       error: 'Profile update failed',
@@ -118,16 +118,16 @@ router.put('/profile/:userId', async (req, res) => {
   }
 });
 
-// Get all users (broken access control)
+
 router.get('/all', async (req, res) => {
   try {
-    // VULNERABILITY: No access control - anyone can get all users
+    
     const users = await User.find({});
     
     res.json({
       success: true,
       count: users.length,
-      users: users, // Includes all sensitive data
+      users: users, 
       metadata: {
         requestedBy: req.ip,
         timestamp: new Date().toISOString(),
@@ -137,7 +137,7 @@ router.get('/all', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Verbose error information
+    
     console.error('Get all users error:', error);
     res.status(500).json({
       error: 'Failed to fetch users',
@@ -148,18 +148,18 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// Delete user profile (IDOR vulnerability)
+
 router.delete('/profile/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // VULNERABILITY: No authentication or authorization
-    // VULNERABILITY: Any user can delete any other user
+    
+    
     
     const user = await User.findByIdAndDelete(userId);
     
     if (!user) {
-      // VULNERABILITY: Information disclosure in error
+      
       return res.status(404).json({
         error: 'User not found for deletion',
         requestedId: userId,
@@ -169,7 +169,7 @@ router.delete('/profile/:userId', async (req, res) => {
       });
     }
     
-    // VULNERABILITY: Return deleted user data
+    
     res.json({
       success: true,
       message: 'User deleted successfully',
@@ -182,7 +182,7 @@ router.delete('/profile/:userId', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Detailed error exposure
+    
     console.error('User deletion error:', error);
     res.status(500).json({
       error: 'User deletion failed',
@@ -193,14 +193,14 @@ router.delete('/profile/:userId', async (req, res) => {
   }
 });
 
-// Change user role (privilege escalation vulnerability)
+
 router.post('/role/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
     
-    // VULNERABILITY: No authentication or authorization check
-    // VULNERABILITY: Anyone can change anyone's role to admin
+    
+    
     
     const user = await User.findByIdAndUpdate(
       userId,
@@ -209,7 +209,7 @@ router.post('/role/:userId', async (req, res) => {
     );
     
     if (!user) {
-      // VULNERABILITY: Verbose error message
+      
       return res.status(404).json({
         error: 'User not found for role change',
         requestedId: userId,
@@ -231,7 +231,7 @@ router.post('/role/:userId', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Error information disclosure
+    
     console.error('Role change error:', error);
     res.status(500).json({
       error: 'Role change failed',
@@ -243,17 +243,17 @@ router.post('/role/:userId', async (req, res) => {
   }
 });
 
-// Search users (information disclosure)
+
 router.get('/search', async (req, res) => {
   try {
     const { query, field } = req.query;
     
-    // VULNERABILITY: No access control
-    // VULNERABILITY: Allows searching sensitive fields
+    
+    
     
     let searchQuery = {};
     if (field && query) {
-      // VULNERABILITY: Direct field access without validation
+      
       searchQuery[field] = new RegExp(query, 'i');
     }
     
@@ -263,7 +263,7 @@ router.get('/search', async (req, res) => {
       success: true,
       searchQuery: searchQuery,
       count: users.length,
-      users: users, // All user data exposed
+      users: users, 
       metadata: {
         searchedBy: req.ip,
         timestamp: new Date().toISOString(),
@@ -273,7 +273,7 @@ router.get('/search', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Detailed error information
+    
     console.error('User search error:', error);
     res.status(500).json({
       error: 'User search failed',
@@ -285,22 +285,22 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// Profile picture upload with path traversal vulnerability
+
 router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
-  // VULNERABILITY: No authentication check
-  // VULNERABILITY: IDOR - any user can upload pictures for any other user
+  
+  
   
   const { userId } = req.params;
   
-  // VULNERABILITY: Custom upload path from request body allows path traversal
+  
   let uploadPath = './uploads/profiles';
   
   if (req.body.uploadPath) {
-    // VULNERABILITY: No sanitization - allows "../../../" traversal
+    
     uploadPath = req.body.uploadPath;
   }
   
-  // VULNERABILITY: Create directory without validation
+  
   try {
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -309,16 +309,16 @@ router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
     console.error('Directory creation error:', error);
   }
   
-  // VULNERABILITY: Configure multer with dangerous settings
+  
   const profileUpload = upload.fields([
     { name: 'profilePicture', maxCount: 1 },
     { name: 'backgroundImage', maxCount: 1 },
-    { name: 'documents', maxCount: 10 } // VULNERABILITY: Allow document uploads
+    { name: 'documents', maxCount: 10 } 
   ]);
   
   profileUpload(req, res, async (err) => {
     if (err) {
-      // VULNERABILITY: Expose detailed upload error information
+      
       return res.status(400).json({
         error: 'Upload failed',
         details: err.message,
@@ -329,30 +329,30 @@ router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
     }
     
     try {
-      // VULNERABILITY: No validation that user exists
+      
       const user = await User.findById(userId);
       
       if (!user) {
-        // VULNERABILITY: Still process files even if user doesn't exist
+        
         console.log(`User ${userId} not found, but files uploaded anyway`);
       }
       
       const uploadedFiles = [];
       
-      // Process uploaded files
+      
       if (req.files) {
         Object.keys(req.files).forEach(fieldName => {
           req.files[fieldName].forEach(file => {
-            // VULNERABILITY: Allow custom filename with path traversal
+            
             let finalPath = file.path;
             
             if (req.body.customFilename) {
-              // VULNERABILITY: No sanitization of custom filename
+              
               const customName = req.body.customFilename;
               const dir = path.dirname(file.path);
-              finalPath = path.join(dir, customName); // Can include "../../../malicious.php"
+              finalPath = path.join(dir, customName); 
               
-              // VULNERABILITY: Move file to custom location
+              
               try {
                 fs.renameSync(file.path, finalPath);
               } catch (error) {
@@ -364,7 +364,7 @@ router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
               fieldName: fieldName,
               originalName: file.originalname,
               filename: file.filename,
-              path: finalPath, // VULNERABILITY: Expose full file path
+              path: finalPath, 
               size: file.size,
               mimetype: file.mimetype,
               uploadedAt: new Date().toISOString()
@@ -373,16 +373,16 @@ router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
         });
       }
       
-      // VULNERABILITY: Update user profile with file paths (if user exists)
+      
       if (user) {
         const profilePicture = uploadedFiles.find(f => f.fieldName === 'profilePicture');
         if (profilePicture) {
-          user.profile.profilePicture = profilePicture.path; // Store full path
+          user.profile.profilePicture = profilePicture.path; 
           await user.save();
         }
       }
       
-      // VULNERABILITY: Return detailed file information
+      
       res.json({
         success: true,
         message: 'Files uploaded successfully',
@@ -399,7 +399,7 @@ router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
       });
       
     } catch (error) {
-      // VULNERABILITY: Expose detailed error information
+      
       console.error('Profile picture upload error:', error);
       res.status(500).json({
         error: 'Profile picture upload failed',
@@ -413,20 +413,20 @@ router.post('/profile/:userId/upload-picture', uploadMiddleware, (req, res) => {
   });
 });
 
-// Serve profile pictures with path traversal vulnerability
+
 router.get('/profile/:userId/picture', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // VULNERABILITY: No access control
-    // VULNERABILITY: Allow custom file path via query parameter
+    
+    
     let filePath;
     
     if (req.query.path) {
-      // VULNERABILITY: Direct path traversal - no sanitization
-      filePath = req.query.path; // Can be "../../../etc/passwd"
+      
+      filePath = req.query.path; 
     } else {
-      // Default behavior - still vulnerable through user profile
+      
       const user = await User.findById(userId);
       if (!user || !user.profile.profilePicture) {
         return res.status(404).json({
@@ -438,24 +438,24 @@ router.get('/profile/:userId/picture', async (req, res) => {
       filePath = user.profile.profilePicture;
     }
     
-    // VULNERABILITY: Log file access for information disclosure
+    
     console.log(`Serving profile picture: ${filePath}`);
     console.log(`Requested by: ${req.ip}`);
     
-    // VULNERABILITY: No validation of file path
+    
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
         error: 'File not found',
-        requestedPath: filePath, // Information disclosure
+        requestedPath: filePath, 
         userId: userId,
         timestamp: new Date().toISOString()
       });
     }
     
-    // VULNERABILITY: Serve any file without proper content-type validation
+    
     const stats = fs.statSync(filePath);
     
-    // VULNERABILITY: Expose file system information
+    
     res.set({
       'X-File-Path': filePath,
       'X-File-Size': stats.size,
@@ -463,7 +463,7 @@ router.get('/profile/:userId/picture', async (req, res) => {
       'X-File-Modified': stats.mtime
     });
     
-    // VULNERABILITY: Execute files if they have executable extensions
+    
     const ext = path.extname(filePath).toLowerCase();
     if (['.php', '.jsp', '.asp', '.aspx', '.js'].includes(ext)) {
       console.log(`WARNING: Serving potentially executable file: ${filePath}`);
@@ -472,7 +472,7 @@ router.get('/profile/:userId/picture', async (req, res) => {
     res.sendFile(path.resolve(filePath));
     
   } catch (error) {
-    // VULNERABILITY: Expose detailed error information
+    
     console.error('Profile picture serving error:', error);
     res.status(500).json({
       error: 'Failed to serve profile picture',
@@ -485,44 +485,44 @@ router.get('/profile/:userId/picture', async (req, res) => {
   }
 });
 
-// List uploaded files for user (directory traversal)
+
 router.get('/profile/:userId/files', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // VULNERABILITY: No access control
+    
     let directory = './uploads/profiles';
     
-    // VULNERABILITY: Allow custom directory listing via query parameter
+    
     if (req.query.dir) {
-      directory = req.query.dir; // Can be "../../../" to list system directories
+      directory = req.query.dir; 
     }
     
-    // VULNERABILITY: No validation of directory path
+    
     if (!fs.existsSync(directory)) {
       return res.status(404).json({
         error: 'Directory not found',
-        requestedDirectory: directory, // Information disclosure
+        requestedDirectory: directory, 
         userId: userId
       });
     }
     
-    // VULNERABILITY: List all files without access control
+    
     const files = fs.readdirSync(directory);
     
-    // VULNERABILITY: Expose detailed file information
+    
     const fileDetails = files.map(file => {
       const filePath = path.join(directory, file);
       try {
         const stats = fs.statSync(filePath);
         return {
           name: file,
-          fullPath: filePath, // Expose full file system path
+          fullPath: filePath, 
           size: stats.size,
           created: stats.birthtime,
           modified: stats.mtime,
           isDirectory: stats.isDirectory(),
-          permissions: stats.mode.toString(8), // Expose file permissions
+          permissions: stats.mode.toString(8), 
           owner: stats.uid,
           group: stats.gid,
           extension: path.extname(file),
@@ -540,7 +540,7 @@ router.get('/profile/:userId/files', async (req, res) => {
     res.json({
       success: true,
       userId: userId,
-      directory: directory, // Expose directory path
+      directory: directory, 
       count: files.length,
       files: fileDetails,
       metadata: {
@@ -551,7 +551,7 @@ router.get('/profile/:userId/files', async (req, res) => {
     });
     
   } catch (error) {
-    // VULNERABILITY: Expose directory traversal errors
+    
     console.error('File listing error:', error);
     res.status(500).json({
       error: 'File listing failed',
@@ -564,5 +564,4 @@ router.get('/profile/:userId/files', async (req, res) => {
   }
 });
 
-module.exports = router;/ /   U s e r   m a n a g e m e n t  
- 
+module.exports = router;

@@ -1,6 +1,6 @@
-/* Stripe Checkout Styles */
-.stripe-checkout-wrapper {
-  max-width: 500px;
+/* Payment Demo Styles */
+.payment-demo {
+  max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
