@@ -1,118 +1,333 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
+const crypto = require('crypto');
+const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const { ActivityLogger } = require('../services/activityLogger');
+const { requireCaptcha } = require('../middleware/captcha');
+const { 
+  authenticateToken, 
+  loginLimiter, 
+  registerLimiter, 
+  passwordResetLimiter,
+  mfaLimiter,
+  checkAccountLockout,
+  validatePasswordStrength,
+  generateSecureToken
+} = require('../middleware/auth');
+
 const router = express.Router();
 
+// Validation rules
+const registerValidation = [
+  body('username')
+    .isLength({ min: 3, max: 30 })
+    .matches(/^[a-zA-Z0-9_]+$/)
+    .withMessage('Username must be 3-30 characters and contain only letters, numbers, and underscores'),
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long'),
+  body('firstName')
+    .optional()
+    .isLength({ max: 50 })
+    .trim()
+    .withMessage('First name must be less than 50 characters'),
+  body('lastName')
+    .optional()
+    .isLength({ max: 50 })
+    .trim()
+    .withMessage('Last name must be less than 50 characters')
+];
 
-router.post('/register', async (req, res) => {
+const loginValidation = [
+  body('username')
+    .notEmpty()
+    .withMessage('Username or email is required'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+];
+
+// User Registration with Enhanced Security
+router.post('/register', registerLimiter, registerValidation, async (req, res) => {
   try {
-    const { username, email, password, firstName, lastName } = req.body;
-    
-    
-    if (!password) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(400).json({
-        error: 'Password is required',
-        timestamp: new Date().toISOString()
+        error: 'Validation failed',
+        details: errors.array()
       });
     }
-    
-    
+
+    const { username, email, password, firstName, lastName } = req.body;
+
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        error: 'Password does not meet security requirements',
+        requirements: passwordValidation.errors,
+        strength: passwordValidation.strength
+      });
+    }
+
+    // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ username }, { email }] 
     });
-    
+
     if (existingUser) {
+      await ActivityLogger.logSecurityViolation(
+        null,
+        username,
+        'DUPLICATE_REGISTRATION_ATTEMPT',
+        { email, existingField: existingUser.username === username ? 'username' : 'email' },
+        req
+      );
       return res.status(400).json({
         error: 'User already exists',
-        timestamp: new Date().toISOString()
+        field: existingUser.username === username ? 'username' : 'email'
       });
     }
-    
-    
-    const hashedPassword = await bcrypt.hash(password, 12);
-    
-    
+
+    // Create new user
     const newUser = new User({
       username,
       email,
-      password: hashedPassword,
+      password, // Will be hashed by pre-save middleware
       profile: {
-        firstName,
-        lastName
+        firstName: firstName || '',
+        lastName: lastName || ''
       },
       role: 'user',
-      createdAt: new Date()
+      accountStatus: 'active' // Changed from pending_verification for demo
     });
-    
+
     await newUser.save();
-    
-    
+
+    // Generate JWT token
+    const sessionToken = generateSecureToken();
+    newUser.sessionToken = sessionToken;
+    await newUser.save();
+
     const token = jwt.sign(
-      { userId: newUser._id, username: newUser.username, role: newUser.role },
-      process.env.JWT_SECRET || 'default-secret',
+      { 
+        userId: newUser._id, 
+        username: newUser.username, 
+        role: newUser.role,
+        sessionToken 
+      },
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
-    
+
+    // Log successful registration
+    await ActivityLogger.logAuth(
+      newUser._id.toString(),
+      newUser.username,
+      'REGISTER',
+      true,
+      { email, accountStatus: 'active' },
+      req
+    );
+
     res.status(201).json({
       message: 'User registered successfully',
       user: {
         id: newUser._id,
         username: newUser.username,
         email: newUser.email,
-        role: newUser.role
+        role: newUser.role,
+        accountStatus: newUser.accountStatus,
+        emailVerified: newUser.emailVerified
       },
-      token
+      token,
+      passwordStrength: passwordValidation.strength
     });
-    
+
   } catch (error) {
-    console.error('Registration error:', error.message);
-    
+    console.error('Registration error:', error);
+    await ActivityLogger.logAuth(
+      null,
+      req.body.username || 'unknown',
+      'REGISTER',
+      false,
+      { error: error.message },
+      req
+    );
     res.status(500).json({
       error: 'Registration failed',
-      timestamp: new Date().toISOString()
+      message: 'Internal server error'
     });
   }
 });
 
-
-router.post('/login', async (req, res) => {
+// User Login with Enhanced Security
+router.post('/login', loginLimiter, checkAccountLockout, requireCaptcha, loginValidation, async (req, res) => {
   try {
-    const { username, password } = req.body;
-    
-    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const { username, password, mfaToken } = req.body;
+
+    // Find user
     const user = await User.findOne({ 
       $or: [{ username }, { email: username }] 
-    });
-    
+    }).select('+twoFactorSecret');
+
     if (!user) {
+      await ActivityLogger.logAuth(
+        null,
+        username,
+        'LOGIN_FAILED',
+        false,
+        { reason: 'user_not_found' },
+        req
+      );
       return res.status(401).json({
-        error: 'Invalid credentials',
-        timestamp: new Date().toISOString()
+        error: 'Invalid credentials'
       });
     }
-    
-    
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    
+
+    // Check password
+    const isValidPassword = await user.comparePassword(password);
     if (!isValidPassword) {
+      await user.incrementFailedAttempts();
+      
+      // Increment session failed attempts for CAPTCHA
+      req.session.failedAttempts = (req.session.failedAttempts || 0) + 1;
+      
+      await ActivityLogger.logAuth(
+        user._id,
+        user.username,
+        'LOGIN_FAILED',
+        false,
+        { reason: 'invalid_password', failedAttempts: user.accountLockout.failedAttempts + 1 },
+        req
+      );
       return res.status(401).json({
-        error: 'Invalid credentials',
-        timestamp: new Date().toISOString()
+        error: 'Invalid credentials'
       });
     }
+
+    // Check if password has expired
+    if (user.isPasswordExpired()) {
+      await ActivityLogger.logAuth(
+        user._id,
+        user.username,
+        'LOGIN_BLOCKED',
+        false,
+        { reason: 'password_expired' },
+        req
+      );
+      return res.status(401).json({
+        error: 'Password has expired',
+        code: 'PASSWORD_EXPIRED',
+        message: 'Please reset your password to continue'
+      });
+    }
+
+    // Check if MFA is required
+    if (user.twoFactorEnabled) {
+      if (!mfaToken) {
+        return res.status(200).json({
+          mfaRequired: true,
+          message: 'Multi-factor authentication required'
+        });
+      }
+
+      // Verify MFA token
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: 'base32',
+        token: mfaToken,
+        window: 2
+      });
+
+      if (!verified) {
+        // Check backup codes
+        const backupCode = user.twoFactorBackupCodes.find(
+          code => code.code === mfaToken.toUpperCase() && !code.used
+        );
+
+        if (!backupCode) {
+          await ActivityLogger.logAuth(
+            user._id,
+            user.username,
+            'MFA_FAILED',
+            false,
+            { reason: 'invalid_token' },
+            req
+          );
+          return res.status(401).json({
+            error: 'Invalid MFA token'
+          });
+        }
+
+        // Mark backup code as used
+        backupCode.used = true;
+        backupCode.usedAt = new Date();
+        await user.save();
+      }
+    }
+
+    // Reset failed attempts on successful login
+    await user.resetFailedAttempts();
     
-    
+    // Reset session failed attempts
+    req.session.failedAttempts = 0;
+
+    // Update login information
     user.lastLogin = new Date();
+    user.loginCount += 1;
+    user.lastActivity = new Date();
+
+    // Generate new session token
+    const sessionToken = generateSecureToken();
+    user.sessionToken = sessionToken;
+
+    // Add session tracking
+    user.addSession(req.sessionID, ActivityLogger.getClientIP(req), req.get('User-Agent'));
+
     await user.save();
-    
-    
+
+    // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, username: user.username, role: user.role },
-      process.env.JWT_SECRET || 'default-secret',
+      { 
+        userId: user._id, 
+        username: user.username, 
+        role: user.role,
+        sessionToken 
+      },
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
-    
+
+    // Log successful login
+    await ActivityLogger.logAuth(
+      user._id,
+      user.username,
+      'LOGIN_SUCCESS',
+      true,
+      { 
+        mfaUsed: user.twoFactorEnabled,
+        loginCount: user.loginCount 
+      },
+      req
+    );
+
     res.json({
       message: 'Login successful',
       user: {
@@ -120,88 +335,72 @@ router.post('/login', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        accountStatus: user.accountStatus,
+        emailVerified: user.emailVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
         profile: user.profile
       },
-      token
+      token,
+      sessionInfo: {
+        loginCount: user.loginCount,
+        lastLogin: user.lastLogin
+      }
     });
-    
+
   } catch (error) {
-    console.error('Login error:', error.message);
-    
+    console.error('Login error:', error);
+    await ActivityLogger.logAuth(
+      null,
+      req.body.username || 'unknown',
+      'LOGIN_FAILED',
+      false,
+      { error: error.message },
+      req
+    );
     res.status(500).json({
       error: 'Login failed',
-      timestamp: new Date().toISOString()
+      message: 'Internal server error'
     });
   }
 });
-    
-    
-    req.session.user = {
-      id: user._id,
-      username: user.username,
-      password: user.password, 
-      role: user.role,
-      sessionToken: newSessionToken,
-      loginTime: new Date(),
-      clientIP: req.ip || req.connection.remoteAddress, 
-      userAgent: req.headers['user-agent'] 
-    };
-    
 
-router.post('/logout', async (req, res) => {
+// Logout with Session Invalidation
+router.post('/logout', authenticateToken, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(400).json({
-        error: 'No token provided',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret');
-    
+    const user = req.user;
+
+    // Invalidate session token
+    user.sessionToken = null;
+    user.removeSession(req.sessionID);
+    await user.save();
+
+    // Log logout
+    await ActivityLogger.logAuth(
+      user._id,
+      user.username,
+      'LOGOUT',
+      true,
+      {},
+      req
+    );
+
     res.json({
-      message: 'Logout successful',
-      timestamp: new Date().toISOString()
+      message: 'Logout successful'
     });
-    
+
   } catch (error) {
-    console.error('Logout error:', error.message);
-    
+    console.error('Logout error:', error);
     res.status(500).json({
-      error: 'Logout failed',
-      timestamp: new Date().toISOString()
+      error: 'Logout failed'
     });
   }
 });
 
-
-router.get('/validate-session', async (req, res) => {
+// Validate Session
+router.get('/validate-session', authenticateToken, async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      return res.status(401).json({
-        error: 'No token provided',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret');
-    
-    
-    const user = await User.findById(decoded.userId).select('-password');
-    
-    if (!user) {
-      return res.status(401).json({
-        error: 'User not found',
-        timestamp: new Date().toISOString()
-      });
-    }
-    
+    const user = req.user;
+
     res.json({
       valid: true,
       user: {
@@ -209,471 +408,110 @@ router.get('/validate-session', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        profile: user.profile
+        accountStatus: user.accountStatus,
+        emailVerified: user.emailVerified,
+        twoFactorEnabled: user.twoFactorEnabled,
+        profile: user.profile,
+        lastActivity: user.lastActivity,
+        passwordExpired: user.isPasswordExpired()
       }
     });
-    
+
   } catch (error) {
-    console.error('Token validation error:', error.message);
-    
-    res.status(401).json({
-      error: 'Invalid token',
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-module.exports = router;
-
-
-function generateWeakSessionToken(username) {
-  
-  const timestamp = Date.now();
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const timeStr = new Date().toTimeString().slice(0, 8).replace(/:/g, '');
-  
-  
-  const pattern1 = `${username}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
-  
-  
-  const pattern2 = `token_${username}_${dateStr}_${timeStr}`;
-  
-  
-  const sessionCounter = global.sessionCounter || 1000;
-  global.sessionCounter = sessionCounter + 1;
-  const pattern3 = `sess_${username}_${sessionCounter}`;
-  
-  
-  const fakeHash = Buffer.from(`${username}${timestamp}`).toString('base64').slice(0, 16);
-  const pattern4 = `auth_${fakeHash}_${username}`;
-  
-  
-  const patterns = [pattern1, pattern2, pattern3, pattern4];
-  const chosenPattern = patterns[Math.floor(Math.random() * patterns.length)];
-  
-  console.log('Generated weak session token using pattern:', chosenPattern); 
-  console.log('Available patterns:', patterns); 
-  
-  return chosenPattern;
-}
-
-
-function getLoginAttempts(username) {
-  
-  const attempts = Math.floor(Math.random() * 5) + 1;
-  return {
-    count: attempts,
-    lastAttempt: new Date(Date.now() - Math.random() * 3600000).toISOString(),
-    remainingAttempts: 5 - attempts,
-    lockoutThreshold: 5,
-    currentIP: '192.168.1.100' 
-  };
-}
-
-
-router.get('/check-username/:username', async (req, res) => {
-  try {
-    const { username } = req.params;
-    
-    
-    const query = `SELECT username FROM users WHERE username = '${username}'`;
-    console.log('Username check query:', query); 
-    
-    const existingUser = await User.findOne({ username: username });
-    
-    
-    if (existingUser) {
-      res.json({
-        exists: true,
-        message: 'Username already taken',
-        userData: {
-          id: existingUser._id,
-          username: existingUser.username,
-          email: existingUser.email, 
-          createdAt: existingUser.createdAt
-        }
-      });
-    } else {
-      res.json({
-        exists: false,
-        message: 'Username available',
-        suggestedUsernames: [
-          `${username}1`,
-          `${username}_user`,
-          `new_${username}`
-        ]
-      });
-    }
-    
-  } catch (error) {
-    console.error('Username check error:', error);
-    
-    
+    console.error('Session validation error:', error);
     res.status(500).json({
-      error: 'Username check failed',
-      details: error.message,
-      stack: error.stack, 
-      requestedUsername: req.params.username 
+      error: 'Session validation failed'
     });
   }
 });
 
-
-router.get('/check-email/:email', async (req, res) => {
+// Change Password
+router.post('/change-password', authenticateToken, [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters long')
+], async (req, res) => {
   try {
-    const { email } = req.params;
-    
-    const existingUser = await User.findOne({ email: email });
-    
-    
-    if (existingUser) {
-      res.json({
-        registered: true,
-        message: 'Email already registered',
-        accountInfo: {
-          username: existingUser.username, 
-          registrationDate: existingUser.createdAt,
-          lastLogin: existingUser.lastLogin || 'Never'
-        }
-      });
-    } else {
-      res.json({
-        registered: false,
-        message: 'Email available for registration'
-      });
-    }
-    
-  } catch (error) {
-    console.error('Email check error:', error);
-    
-    
-    res.status(500).json({
-      error: 'Email check failed',
-      details: error.message,
-      stack: error.stack, 
-      requestedEmail: req.params.email 
-    });
-  }
-});
-
-
-router.post('/forgot-password', async (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    if (!email) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
       return res.status(400).json({
-        error: 'Email is required',
-        receivedData: req.body, 
-        timestamp: new Date().toISOString()
+        error: 'Validation failed',
+        details: errors.array()
       });
     }
-    
-    const user = await User.findOne({ email: email });
-    
-    if (!user) {
-      
-      return res.status(404).json({
-        error: 'Email not found',
-        message: 'No account associated with this email address',
-        providedEmail: email, 
-        registrationLink: '/api/auth/register',
-        timestamp: new Date().toISOString()
+
+    const { currentPassword, newPassword } = req.body;
+    const user = req.user;
+
+    // Verify current password
+    const isValidPassword = await user.comparePassword(currentPassword);
+    if (!isValidPassword) {
+      await ActivityLogger.logAuth(
+        user._id,
+        user.username,
+        'PASSWORD_CHANGE_FAILED',
+        false,
+        { reason: 'invalid_current_password' },
+        req
+      );
+      return res.status(401).json({
+        error: 'Current password is incorrect'
       });
     }
-    
-    
-    const resetToken = generatePredictableResetToken(user.username, user.email);
-    const resetExpiry = new Date(Date.now() + 15 * 60 * 1000); 
-    
-    
-    user.resetToken = resetToken;
-    user.resetTokenExpiry = resetExpiry;
-    await user.save();
-    
-    
-    res.json({
-      message: 'Password reset token generated',
-      resetToken: resetToken, 
-      expiresAt: resetExpiry,
-      user: {
-        id: user._id,
-        username: user.username, 
-        email: user.email,
-        resetTokenPattern: 'reset_username_timestamp_email', 
-      },
-      resetUrl: `/api/auth/reset-password?token=${resetToken}`, 
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Password reset error:', error);
-    
-    
-    res.status(500).json({
-      error: 'Password reset failed',
-      details: error.message,
-      stack: error.stack, 
-      requestData: req.body, 
-      timestamp: new Date().toISOString()
-    });
-  }
-});
 
-
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-    const tokenFromQuery = req.query.token;
-    
-    const resetToken = token || tokenFromQuery;
-    
-    if (!resetToken) {
+    // Validate new password strength
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.isValid) {
       return res.status(400).json({
-        error: 'Reset token is required',
-        acceptedSources: ['body.token', 'query.token'],
-        tokenFormat: 'reset_username_timestamp_email',
-        timestamp: new Date().toISOString()
+        error: 'New password does not meet security requirements',
+        requirements: passwordValidation.errors,
+        strength: passwordValidation.strength
       });
     }
-    
-    if (!newPassword) {
-      return res.status(400).json({
-        error: 'New password is required',
-        receivedData: req.body, 
-        timestamp: new Date().toISOString()
-      });
+
+    // Check password reuse (this will be handled by the pre-save middleware)
+    try {
+      user.password = newPassword;
+      await user.save();
+    } catch (error) {
+      if (error.message.includes('Cannot reuse')) {
+        return res.status(400).json({
+          error: 'Cannot reuse any of the last 5 passwords',
+          code: 'PASSWORD_REUSE_VIOLATION'
+        });
+      }
+      throw error;
     }
-    
-    
-    const user = await User.findOne({ resetToken: resetToken });
-    
-    if (!user) {
-      
-      return res.status(400).json({
-        error: 'Invalid reset token',
-        providedToken: resetToken, 
-        tokenFormat: 'Expected format: reset_username_timestamp_email',
-        possibleReasons: [
-          'Token expired',
-          'Token already used',
-          'Invalid token format'
-        ],
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    
-    if (user.resetTokenExpiry && user.resetTokenExpiry < new Date()) {
-      
-      console.log('Expired token used, but allowing reset anyway:', resetToken);
-    }
-    
-    
-    
-    user.password = newPassword; 
-    user.resetToken = null; 
-    user.resetTokenExpiry = null;
-    
-    
-    
-    await user.save();
-    
-    
+
+    await ActivityLogger.logAuth(
+      user._id,
+      user.username,
+      'PASSWORD_CHANGE',
+      true,
+      { passwordStrength: passwordValidation.strength },
+      req
+    );
+
     res.json({
-      message: 'Password reset successful',
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        newPassword: newPassword, 
-        sessionToken: user.sessionToken, 
-        lastLogin: user.lastLogin
-      },
-      securityNote: 'Existing sessions remain valid after password reset',
-      loginUrl: '/api/auth/login',
-      timestamp: new Date().toISOString()
+      message: 'Password changed successfully',
+      passwordStrength: passwordValidation.strength,
+      expiresAt: user.passwordExpiresAt
     });
-    
+
   } catch (error) {
-    console.error('Password reset error:', error);
-    
-    
+    console.error('Password change error:', error);
+    await ActivityLogger.logAuth(
+      req.user?._id,
+      req.user?.username || 'unknown',
+      'PASSWORD_CHANGE_FAILED',
+      false,
+      { error: error.message },
+      req
+    );
     res.status(500).json({
-      error: 'Password reset failed',
-      details: error.message,
-      stack: error.stack, 
-      requestData: req.body, 
-      timestamp: new Date().toISOString()
+      error: 'Password change failed',
+      message: 'Internal server error'
     });
   }
 });
-
-
-router.get('/validate-reset-token/:token', async (req, res) => {
-  try {
-    const { token } = req.params;
-    
-    const user = await User.findOne({ resetToken: token });
-    
-    if (!user) {
-      return res.status(400).json({
-        valid: false,
-        error: 'Invalid reset token',
-        providedToken: token, 
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-    
-    res.json({
-      valid: true,
-      message: 'Reset token is valid',
-      user: {
-        id: user._id,
-        username: user.username, 
-        email: user.email, 
-        tokenIssuedAt: user.resetTokenExpiry ? new Date(user.resetTokenExpiry.getTime() - 15 * 60 * 1000) : null,
-        expiresAt: user.resetTokenExpiry
-      },
-      tokenInfo: {
-        token: token, 
-        remainingTime: user.resetTokenExpiry ? user.resetTokenExpiry.getTime() - Date.now() : null,
-        isExpired: user.resetTokenExpiry ? user.resetTokenExpiry < new Date() : false
-      },
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('Token validation error:', error);
-    
-    
-    res.status(500).json({
-      error: 'Token validation failed',
-      details: error.message,
-      stack: error.stack, 
-      requestedToken: req.params.token, 
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-
-router.get('/session-info', (req, res) => {
-  try {
-    
-    res.json({
-      sessionId: req.sessionID,
-      sessionData: req.session, 
-      cookieInfo: {
-        name: 'sessionid',
-        secure: false, 
-        httpOnly: false, 
-        sameSite: false, 
-        maxAge: 24 * 60 * 60 * 1000,
-        domain: undefined,
-        path: '/'
-      },
-      sessionStore: {
-        type: 'MemoryStore', 
-        sessionCount: Object.keys(req.sessionStore.sessions || {}).length
-      },
-      serverInfo: {
-        nodeVersion: process.version,
-        platform: process.platform,
-        uptime: process.uptime()
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Session info retrieval failed',
-      details: error.message,
-      stack: error.stack
-    });
-  }
-});
-
-
-router.post('/fixate-session', (req, res) => {
-  try {
-    const { targetSessionId } = req.body;
-    
-    if (targetSessionId) {
-      
-      req.sessionID = targetSessionId;
-      console.log('Session fixation attack - set session ID to:', targetSessionId);
-      
-      res.json({
-        message: 'Session ID fixated successfully',
-        oldSessionId: req.sessionID,
-        newSessionId: targetSessionId,
-        vulnerability: 'Session fixation enabled',
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      res.status(400).json({
-        error: 'Target session ID required',
-        example: 'sess_1234567890_123',
-        currentSessionId: req.sessionID
-      });
-    }
-  } catch (error) {
-    res.status(500).json({
-      error: 'Session fixation failed',
-      details: error.message,
-      stack: error.stack
-    });
-  }
-});
-
-
-router.get('/active-sessions', (req, res) => {
-  try {
-    
-    const sessionStore = req.sessionStore;
-    const activeSessions = [];
-    
-    if (sessionStore.sessions) {
-      Object.keys(sessionStore.sessions).forEach(sessionId => {
-        try {
-          const sessionData = JSON.parse(sessionStore.sessions[sessionId]);
-          activeSessions.push({
-            sessionId: sessionId,
-            user: sessionData.user || null,
-            loginHistory: sessionData.loginHistory || [],
-            createdAt: sessionData.cookie ? new Date(sessionData.cookie.originalMaxAge) : null
-          });
-        } catch (parseError) {
-          
-        }
-      });
-    }
-    
-    res.json({
-      totalSessions: activeSessions.length,
-      sessions: activeSessions, 
-      vulnerability: 'All active sessions exposed',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Active sessions retrieval failed',
-      details: error.message,
-      stack: error.stack
-    });
-  }
-});
-
-
-function generatePredictableResetToken(username, email) {
-  
-  const timestamp = Date.now();
-  const emailHash = email.split('@')[0]; 
-  const predictableToken = `reset_${username}_${timestamp}_${emailHash}`;
-  
-  console.log('Generated predictable reset token:', predictableToken); 
-  return predictableToken;
-}
 
 module.exports = router;

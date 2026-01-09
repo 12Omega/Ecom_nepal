@@ -1,0 +1,141 @@
+{
+  "timestamp": "2026-01-09T07:01:27.090Z",
+  "vulnerabilities": [
+    {
+      "severity": "HIGH",
+      "category": "Environment",
+      "issue": "Environment Variables",
+      "description": "Missing: JWT_SECRET, SESSION_SECRET, MONGODB_URI",
+      "recommendation": "Set all required environment variables with strong, unique values"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "Session",
+      "issue": "JWT Security",
+      "description": "JWT secret is weak or missing",
+      "recommendation": "Use strong JWT secrets and proper token validation"
+    },
+    {
+      "severity": "MEDIUM",
+      "category": "Database",
+      "issue": "Database Connection Security",
+      "description": "Database connection may not be secure",
+      "recommendation": "Secure database connections and encrypt sensitive data"
+    }
+  ],
+  "recommendations": [],
+  "testResults": [
+    {
+      "category": "Environment",
+      "test": "Environment Variables",
+      "passed": false,
+      "details": "Missing: JWT_SECRET, SESSION_SECRET, MONGODB_URI"
+    },
+    {
+      "category": "Environment",
+      "test": "Secret Strength",
+      "passed": true,
+      "details": "Secrets have adequate strength"
+    },
+    {
+      "category": "Environment",
+      "test": "Production Configuration",
+      "passed": true,
+      "details": "Configuration appropriate for environment"
+    },
+    {
+      "category": "Authentication",
+      "test": "Password Policy",
+      "passed": true,
+      "details": "Strong password policy enforced"
+    },
+    {
+      "category": "Authentication",
+      "test": "Account Lockout",
+      "passed": true,
+      "details": "Account lockout mechanism active"
+    },
+    {
+      "category": "Authentication",
+      "test": "MFA Support",
+      "passed": true,
+      "details": "Multi-factor authentication available"
+    },
+    {
+      "category": "Session",
+      "test": "Session Configuration",
+      "passed": true,
+      "details": "Secure session configuration"
+    },
+    {
+      "category": "Session",
+      "test": "JWT Security",
+      "details": "JWT secret is weak or missing"
+    },
+    {
+      "category": "Input Validation",
+      "test": "XSS Protection",
+      "passed": true,
+      "details": "XSS protection mechanisms active"
+    },
+    {
+      "category": "Input Validation",
+      "test": "SQL Injection Protection",
+      "passed": true,
+      "details": "Using parameterized queries (Mongoose)"
+    },
+    {
+      "category": "Rate Limiting",
+      "test": "Global Rate Limiting",
+      "passed": true,
+      "details": "Global rate limiting active"
+    },
+    {
+      "category": "Rate Limiting",
+      "test": "Authentication Rate Limiting",
+      "passed": true,
+      "details": "Authentication endpoints rate limited"
+    },
+    {
+      "category": "HTTPS/TLS",
+      "test": "Security Headers",
+      "passed": true,
+      "details": "Security headers configured (Helmet)"
+    },
+    {
+      "category": "HTTPS/TLS",
+      "test": "HTTPS Enforcement",
+      "passed": true,
+      "details": "Development environment"
+    },
+    {
+      "category": "Database",
+      "test": "Database Connection Security",
+      "details": "Database connection may not be secure"
+    },
+    {
+      "category": "Database",
+      "test": "Data Encryption",
+      "passed": true,
+      "details": "Data encryption utilities available"
+    },
+    {
+      "category": "File Upload",
+      "test": "File Upload Validation",
+      "passed": true,
+      "details": "File upload security implemented"
+    }
+  ],
+  "overallScore": 62,
+  "generatedAt": "2026-01-09T07:01:27.093Z",
+  "summary": {
+    "totalTests": 17,
+    "passedTests": 14,
+    "failedTests": 3,
+    "vulnerabilities": {
+      "high": 1,
+      "medium": 2,
+      "low": 0
+    }
+  }
+}
