@@ -82,6 +82,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
     setError('');
   };
 
+  const handleDemoLogin = (username: string, password: string) => {
+    setFormData(prev => ({
+      ...prev,
+      username,
+      password
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -242,12 +250,103 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, onClose }) => {
             {mfaRequired 
               ? 'Enter the code from your authenticator app'
               : (isLogin 
-                ? 'Sign in to your NepalShop account' 
-                : 'Join NepalShop for secure shopping'
+                ? 'Sign in to your ModernShop account' 
+                : 'Join ModernShop for secure shopping'
               )
             }
           </p>
         </div>
+
+        {/* Demo Credentials (Login only) */}
+        {isLogin && !mfaRequired && (
+          <div style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderRadius: '12px',
+            padding: '20px',
+            marginBottom: '30px',
+            color: 'white'
+          }}>
+            <h3 style={{
+              margin: '0 0 15px 0',
+              fontSize: '16px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              🎯 Demo Credentials
+            </h3>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: window.innerWidth > 480 ? '1fr 1fr' : '1fr',
+              gap: '15px',
+              fontSize: '14px'
+            }}>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('user', 'user123')}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ fontWeight: '600', marginBottom: '8px' }}>👤 Regular User</div>
+                <div style={{ opacity: 0.9 }}>Username: <strong>user</strong></div>
+                <div style={{ opacity: 0.9 }}>Password: <strong>user123</strong></div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('admin', 'admin123')}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ fontWeight: '600', marginBottom: '8px' }}>👑 Admin User</div>
+                <div style={{ opacity: 0.9 }}>Username: <strong>admin</strong></div>
+                <div style={{ opacity: 0.9 }}>Password: <strong>admin123</strong></div>
+              </button>
+            </div>
+            <div style={{
+              marginTop: '15px',
+              padding: '10px',
+              background: 'rgba(255,255,255,0.1)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              textAlign: 'center'
+            }}>
+              💡 <strong>Quick Login:</strong> Click on any credential above to auto-fill the form
+            </div>
+          </div>
+        )}
 
         {/* MFA Form */}
         {mfaRequired ? (

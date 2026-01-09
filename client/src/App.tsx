@@ -6,6 +6,14 @@ import ShoppingCart from './components/ShoppingCart';
 import PaymentDemo from './components/PaymentDemo';
 import StripeCheckout from './components/StripeCheckout';
 import Auth from './components/Auth';
+import AboutUs from './components/AboutUs';
+import ContactUs from './components/ContactUs';
+import Locations from './components/Locations';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfService from './components/TermsOfService';
+import FAQ from './components/FAQ';
+import Footer from './components/Footer';
+import ComingSoon from './components/ComingSoon';
 import './App.css';
 
 // Types
@@ -79,8 +87,10 @@ const Navigation: React.FC<{
   const navItems = [
     { path: '/', label: 'Home', icon: '🏠' },
     { path: '/products', label: 'Products', icon: '🛍️' },
-    { path: '/cart', label: 'Cart', icon: '🛒' },
-    { path: '/payment-demo', label: 'Payment Demo', icon: '💳' }
+    { path: '/about', label: 'About', icon: 'ℹ️' },
+    { path: '/locations', label: 'Stores', icon: '📍' },
+    { path: '/contact', label: 'Contact', icon: '📞' },
+    { path: '/cart', label: 'Cart', icon: '🛒' }
   ];
 
   return (
@@ -127,12 +137,9 @@ const Navigation: React.FC<{
 
         {/* Desktop Navigation */}
         <nav style={{ 
-          display: 'flex', 
+          display: window.innerWidth > 768 ? 'flex' : 'none',
           alignItems: 'center', 
-          gap: '30px',
-          '@media (max-width: 768px)': {
-            display: 'none'
-          }
+          gap: '30px'
         }}>
           {navItems.map((item) => (
             <Link 
@@ -298,15 +305,12 @@ const Navigation: React.FC<{
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             style={{
-              display: 'none',
+              display: window.innerWidth <= 768 ? 'block' : 'none',
               background: 'transparent',
               border: 'none',
               color: isScrolled ? '#64748b' : 'white',
               fontSize: '1.5rem',
-              cursor: 'pointer',
-              '@media (max-width: 768px)': {
-                display: 'block'
-              }
+              cursor: 'pointer'
             }}
           >
             ☰
@@ -362,6 +366,7 @@ function App() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthRequired, setIsAuthRequired] = useState(true);
 
   // Check for existing auth token on app load
   useEffect(() => {
@@ -375,13 +380,18 @@ function App() {
       .then(data => {
         if (data.valid) {
           setUser(data.user);
+          setIsAuthRequired(false);
         } else {
           localStorage.removeItem('authToken');
+          setIsAuthRequired(true);
         }
       })
       .catch(() => {
         localStorage.removeItem('authToken');
+        setIsAuthRequired(true);
       });
+    } else {
+      setIsAuthRequired(true);
     }
   }, []);
 
@@ -460,11 +470,14 @@ function App() {
   const handleAuthSuccess = (userData: User) => {
     setUser(userData);
     setShowAuth(false);
+    setIsAuthRequired(false);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
     setUser(null);
+    setIsAuthRequired(true);
+    setCartItems([]); // Clear cart on logout
   };
 
   const handleCheckoutSuccess = (paymentIntent: any) => {
@@ -567,8 +580,91 @@ function App() {
     `;
     document.head.appendChild(style);
     
-    return () => document.head.removeChild(style);
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
   }, []);
+
+  // Show authentication screen if user is not logged in
+  if (isAuthRequired) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          color: 'white',
+          marginBottom: '40px',
+          maxWidth: '600px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '15px',
+            marginBottom: '30px'
+          }}>
+            <span style={{ fontSize: '3rem' }}>🛍️</span>
+            <h1 style={{
+              fontSize: '3rem',
+              fontWeight: '700',
+              margin: 0
+            }}>
+              ModernShop
+            </h1>
+          </div>
+          <p style={{
+            fontSize: '1.3rem',
+            opacity: 0.9,
+            marginBottom: '40px',
+            lineHeight: '1.6'
+          }}>
+            Your trusted partner for authentic products from Nepal and around the world. 
+            Please sign in to start shopping.
+          </p>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '30px',
+            flexWrap: 'wrap',
+            marginBottom: '40px'
+          }}>
+            {[
+              { icon: '🔒', text: 'Secure Shopping' },
+              { icon: '🚚', text: 'Fast Delivery' },
+              { icon: '⭐', text: 'Quality Products' },
+              { icon: '🌍', text: 'Worldwide Shipping' }
+            ].map((feature, index) => (
+              <div
+                key={index}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '1rem',
+                  opacity: 0.9
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>{feature.icon}</span>
+                <span>{feature.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <Auth
+          onAuthSuccess={handleAuthSuccess}
+          onClose={undefined} // No close button for required auth
+        />
+      </div>
+    );
+  }
 
   if (showCheckout && cartItems.length > 0) {
     return (
@@ -661,10 +757,83 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/products" element={<ProductCatalog />} />
+              <Route path="/about" element={<AboutUs />} />
+              <Route path="/contact" element={<ContactUs />} />
+              <Route path="/locations" element={<Locations />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/faq" element={<FAQ />} />
               <Route path="/cart" element={<ShoppingCart />} />
               <Route path="/payment-demo" element={<PaymentDemo />} />
+              
+              {/* Coming Soon Pages */}
+              <Route path="/shipping" element={
+                <ComingSoon 
+                  title="Shipping Information" 
+                  description="Detailed shipping policies and delivery information coming soon."
+                  icon="🚚"
+                />
+              } />
+              <Route path="/returns" element={
+                <ComingSoon 
+                  title="Returns & Exchanges" 
+                  description="Comprehensive return and exchange policy details coming soon."
+                  icon="↩️"
+                />
+              } />
+              <Route path="/size-guide" element={
+                <ComingSoon 
+                  title="Size Guide" 
+                  description="Interactive size charts and fitting guides coming soon."
+                  icon="📏"
+                />
+              } />
+              <Route path="/track-order" element={
+                <ComingSoon 
+                  title="Order Tracking" 
+                  description="Real-time order tracking system coming soon."
+                  icon="📦"
+                />
+              } />
+              <Route path="/gift-cards" element={
+                <ComingSoon 
+                  title="Gift Cards" 
+                  description="Digital gift cards and voucher system coming soon."
+                  icon="🎁"
+                />
+              } />
+              <Route path="/cookies" element={
+                <ComingSoon 
+                  title="Cookie Policy" 
+                  description="Detailed cookie usage and privacy information coming soon."
+                  icon="🍪"
+                />
+              } />
+              <Route path="/accessibility" element={
+                <ComingSoon 
+                  title="Accessibility" 
+                  description="Accessibility features and compliance information coming soon."
+                  icon="♿"
+                />
+              } />
+              <Route path="/security" element={
+                <ComingSoon 
+                  title="Security Center" 
+                  description="Security measures and data protection information coming soon."
+                  icon="🔒"
+                />
+              } />
+              <Route path="/careers" element={
+                <ComingSoon 
+                  title="Careers" 
+                  description="Join our team! Career opportunities and job listings coming soon."
+                  icon="💼"
+                />
+              } />
             </Routes>
           </main>
+
+          <Footer />
 
           {/* Auth Modal */}
           {showAuth && (

