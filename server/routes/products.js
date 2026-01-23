@@ -13,11 +13,11 @@ router.get('/search', async (req, res) => {
     let query = {};
     
     if (searchTerm) {
-      
-      const escapedSearchTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Basic input sanitization - trim whitespace
+      const cleanTerm = searchTerm.trim();
       query.$or = [
-        { name: { $regex: escapedSearchTerm, $options: 'i' } },
-        { description: { $regex: escapedSearchTerm, $options: 'i' } }
+        { name: { $regex: cleanTerm, $options: 'i' } },
+        { description: { $regex: cleanTerm, $options: 'i' } }
       ];
     }
     
@@ -29,6 +29,7 @@ router.get('/search', async (req, res) => {
     
     
     if (sort) {
+      // Allow flexible sorting on any field
       const sortOptions = {};
       const [field, order] = sort.split(':');
       sortOptions[field] = order === 'desc' ? -1 : 1;
@@ -53,6 +54,8 @@ router.get('/search', async (req, res) => {
     console.error('Search error:', error.message);
     res.status(500).json({
       error: 'Search failed',
+      message: error.message,
+      details: error.toString(),
       timestamp: new Date().toISOString()
     });
   }
@@ -117,6 +120,7 @@ router.get('/', async (req, res) => {
       .limit(parseInt(limit))
       .populate('createdBy', 'username')
       .populate('relatedProducts', 'name price imageUrl averageRating totalReviews')
+      .select('-__v')
       .exec();
     
     const total = await Product.countDocuments(query);
@@ -179,6 +183,7 @@ router.get('/:id', async (req, res) => {
     }
     
     
+    // Return detailed product information
     res.json({
       success: true,
       product: product,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../App';
+import axios from 'axios';
 
 // Diverse product catalog with real images from Unsplash
 const allProducts = [
@@ -186,13 +187,51 @@ const ProductCatalog: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [priceRange, setPriceRange] = useState([0, 300]);
+  const [apiSearchResults, setApiSearchResults] = useState<any[]>([]);
+  const [useApiSearch, setUseApiSearch] = useState(false);
 
   useEffect(() => {
     // Simulate loading
     setTimeout(() => setIsLoading(false), 1000);
   }, []);
 
+  // API Search function - calls backend directly
+  const handleApiSearch = async () => {
+    if (!searchTerm.trim()) {
+      alert('Please enter a search term');
+      return;
+    }
+
+    setIsLoading(true);
+    setUseApiSearch(true);
+
+    try {
+      // Direct API call to backend - will be captured by Burp Suite!
+      const response = await axios.get(`http://localhost:5000/api/products/search?q=${searchTerm}`);
+      setApiSearchResults(response.data.products || []);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('API Search error:', error);
+      alert('Search failed. Please try again.');
+      setIsLoading(false);
+      setUseApiSearch(false);
+    }
+  };
+
+  // Clear API search and return to normal view
+  const clearApiSearch = () => {
+    setUseApiSearch(false);
+    setApiSearchResults([]);
+    setSearchTerm('');
+  };
+
   const filteredAndSortedProducts = () => {
+    // If using API search, return API results
+    if (useApiSearch) {
+      return apiSearchResults;
+    }
+
+    // Otherwise, use client-side filtering
     let filtered = allProducts.filter(product => {
       const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -290,15 +329,20 @@ const ProductCatalog: React.FC = () => {
         }}>
           {/* Search Bar */}
           <div style={{ marginBottom: '25px' }}>
-            <div style={{ position: 'relative', maxWidth: '500px', margin: '0 auto' }}>
+            <div style={{ position: 'relative', maxWidth: '700px', margin: '0 auto', display: 'flex', gap: '10px', alignItems: 'center' }}>
               <input
                 type="text"
                 placeholder="🔍 Search products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleApiSearch();
+                  }
+                }}
                 style={{
-                  width: '100%',
-                  padding: '15px 20px 15px 50px',
+                  flex: 1,
+                  padding: '15px 20px',
                   border: '2px solid #e2e8f0',
                   borderRadius: '25px',
                   fontSize: '16px',
@@ -315,17 +359,72 @@ const ProductCatalog: React.FC = () => {
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               />
-              <span style={{
-                position: 'absolute',
-                left: '20px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                fontSize: '18px',
-                color: '#94a3b8'
-              }}>
-                🔍
-              </span>
+              <button
+                onClick={handleApiSearch}
+                style={{
+                  padding: '15px 30px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '25px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                  whiteSpace: 'nowrap'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                }}
+              >
+                Search
+              </button>
+              {useApiSearch && (
+                <button
+                  onClick={clearApiSearch}
+                  style={{
+                    padding: '15px 25px',
+                    background: '#f44',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '25px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  ✕ Clear
+                </button>
+              )}
             </div>
+            {useApiSearch && (
+              <div style={{
+                textAlign: 'center',
+                marginTop: '15px',
+                padding: '10px',
+                background: '#f0fdf4',
+                borderRadius: '10px',
+                color: '#166534',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}>
+                ✅ Showing results for "{searchTerm}"
+              </div>
+            )}
           </div>
 
           {/* Category Filters */}
@@ -521,7 +620,7 @@ const ProductCatalog: React.FC = () => {
                 flexShrink: 0
               }}>
                 <img 
-                  src={product.image}
+                  src={product.image || product.imageUrl}
                   alt={product.name}
                   style={{
                     width: '100%',
